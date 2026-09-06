@@ -1,0 +1,6 @@
+{
+  "name": "Indian Laws & Legal Information",
+  "description": "Comprehensive, modernized database of Indian laws, Acts, rules, penalties, simplified explanations, categories, and AI legal assistant.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
