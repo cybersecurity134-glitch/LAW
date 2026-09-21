@@ -13,11 +13,13 @@ import {
   ShieldCheck,
   ChevronRight,
   ExternalLink,
-  X
+  X,
+  Database
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { CATEGORIES } from '../data/categories';
 import { drawerVariants, modalBackdropVariants } from '../utils/motion';
+import { preloadTab } from '../utils/preload';
 
 interface SidebarNavItem {
   id: 'home' | 'search' | 'categories' | 'saved' | 'profile';
@@ -209,10 +211,12 @@ const CATEGORY_COLOR_MAP: Record<string, { dot: string; ping: string; border: st
 
 export const Sidebar: React.FC = () => {
   const { 
+    laws,
     activeTab, 
     setActiveTab, 
     bookmarks, 
     setShowAIAssistant, 
+    setShowIngestionModal,
     lastUpdatedTime, 
     isRefreshing, 
     refreshLegalData,
@@ -255,7 +259,7 @@ export const Sidebar: React.FC = () => {
   const mainNav: SidebarNavItem[] = [
     { id: 'home', label: 'Home Dashboard', icon: Home },
     { id: 'search', label: 'Search Laws & Sections', icon: Search },
-    { id: 'categories', label: 'Categories (22)', icon: Layers },
+    { id: 'categories', label: `Categories (${CATEGORIES.length})`, icon: Layers },
     { id: 'saved', label: 'Saved Laws', icon: Bookmark, badge: bookmarks.length },
     { id: 'profile', label: 'Profile & Preferences', icon: User },
   ];
@@ -286,6 +290,9 @@ export const Sidebar: React.FC = () => {
               key={item.id}
               whileTap={{ scale: 0.98 }}
               onClick={() => handleNavClick(item.id)}
+              onMouseEnter={() => preloadTab(item.id)}
+              onTouchStart={() => preloadTab(item.id)}
+              onFocus={() => preloadTab(item.id)}
               className={`relative w-full flex items-center justify-between px-4 py-3 rounded-2xl text-sm text-left cursor-pointer transition-colors duration-200 group overflow-hidden ${
                 isActive
                   ? `${theme.activeText} dark:text-[#FFFFFF]`
@@ -372,6 +379,28 @@ export const Sidebar: React.FC = () => {
             </span>
           </div>
         </motion.button>
+
+        {/* Ingest Law Book Action */}
+        <motion.button
+          whileHover={{ scale: 1.015 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => {
+            setShowIngestionModal(true);
+            setIsMobileSidebarOpen(false);
+          }}
+          className="w-full mt-2 flex items-center justify-between min-h-[44px] px-4 py-2.5 rounded-2xl bg-orange-500/10 hover:bg-orange-500/15 dark:bg-white/[0.03] dark:hover:bg-white/[0.06] border border-orange-500/20 dark:border-white/10 text-orange-800 dark:text-orange-300 text-xs font-semibold group cursor-pointer transition-all duration-200"
+          id="sidebar-ingest-law-btn"
+        >
+          <div className="flex items-center gap-3">
+            <div className="p-1.5 rounded-lg bg-orange-500/15 border border-orange-500/25 dark:bg-[#7C5CFF]/15 dark:border-[#7C5CFF]/25">
+              <Database className="w-4 h-4 text-orange-600 dark:text-[#a78bfa] transition-transform duration-200 group-hover:scale-110" />
+            </div>
+            <span className="font-bold dark:text-white">Ingest Law Book</span>
+          </div>
+          <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded-full bg-orange-500/20 dark:bg-white/10 text-orange-700 dark:text-orange-300 border border-orange-500/30 dark:border-white/10">
+            Pipeline
+          </span>
+        </motion.button>
       </div>
 
       {/* Colorful Reading Mode Toggle */}
@@ -436,6 +465,7 @@ export const Sidebar: React.FC = () => {
         {featuredCategories.map(cat => {
           const catColor = CATEGORY_COLOR_MAP[cat.color] || CATEGORY_COLOR_MAP.amber;
           const isCatActive = activeTab === 'categories' && selectedCategory === cat.id;
+          const activeLawCount = laws.filter(l => l.category_id === cat.id).length;
 
           return (
             <motion.button
@@ -462,12 +492,14 @@ export const Sidebar: React.FC = () => {
                 <span className="truncate font-medium group-hover:translate-x-0.5 transition-transform duration-200">{cat.name}</span>
               </div>
 
-              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full transition-colors shrink-0 ${
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full transition-colors shrink-0 font-mono ${
                 isCatActive
                   ? catColor.badge
-                  : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-[#FFFFFF] bg-slate-100/80 dark:bg-[#151515] dark:text-[#777777]'
+                  : activeLawCount === 0
+                  ? 'text-slate-400 dark:text-slate-500 bg-slate-100/60 dark:bg-[#151515]'
+                  : 'text-slate-500 group-hover:text-slate-700 dark:group-hover:text-[#FFFFFF] bg-slate-100/80 dark:bg-[#151515] dark:text-[#777777]'
               }`}>
-                {cat.sections_count} sec
+                {activeLawCount === 0 ? '0' : `${activeLawCount} laws`}
               </span>
             </motion.button>
           );

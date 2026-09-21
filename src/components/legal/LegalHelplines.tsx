@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Phone, ExternalLink, ShieldCheck, Copy, CheckCircle2, AlertCircle, HelpCircle } from 'lucide-react';
+import { copyToClipboard } from '../../utils/clipboard';
+import { useApp } from '../../context/AppContext';
 
 export interface HelplineItem {
   id: string;
@@ -12,6 +14,7 @@ export interface HelplineItem {
   portalLabel: string;
   notes: string;
   category: 'cyber' | 'legal-aid' | 'consumer' | 'women' | 'emergency' | 'child';
+  status?: 'active' | 'degraded' | 'maintenance';
 }
 
 export const STATUTORY_HELPLINES: HelplineItem[] = [
@@ -25,7 +28,8 @@ export const STATUTORY_HELPLINES: HelplineItem[] = [
     portalUrl: 'https://cybercrime.gov.in',
     portalLabel: 'cybercrime.gov.in',
     notes: 'Report within 2–4 hours of unauthorized transaction to trigger automated bank freeze protocols.',
-    category: 'cyber'
+    category: 'cyber',
+    status: 'active'
   },
   {
     id: 'nalsa',
@@ -37,7 +41,8 @@ export const STATUTORY_HELPLINES: HelplineItem[] = [
     portalUrl: 'https://nalsa.gov.in',
     portalLabel: 'nalsa.gov.in',
     notes: 'All women, children, SC/ST citizens, and eligible income groups are entitled to 100% free legal counsel.',
-    category: 'legal-aid'
+    category: 'legal-aid',
+    status: 'active'
   },
   {
     id: 'consumer',
@@ -49,7 +54,8 @@ export const STATUTORY_HELPLINES: HelplineItem[] = [
     portalUrl: 'https://consumerhelpline.gov.in',
     portalLabel: 'consumerhelpline.gov.in',
     notes: 'Free conciliation for deficient services, defective goods, and fraudulent business practices.',
-    category: 'consumer'
+    category: 'consumer',
+    status: 'active'
   },
   {
     id: 'women',
@@ -61,7 +67,8 @@ export const STATUTORY_HELPLINES: HelplineItem[] = [
     portalUrl: 'https://ncw.nic.in',
     portalLabel: 'ncw.nic.in',
     notes: 'Supports protection orders under the Protection of Women from Domestic Violence Act 2005.',
-    category: 'women'
+    category: 'women',
+    status: 'active'
   },
   {
     id: 'erss',
@@ -73,7 +80,8 @@ export const STATUTORY_HELPLINES: HelplineItem[] = [
     portalUrl: 'https://112.gov.in',
     portalLabel: '112.gov.in',
     notes: 'Single emergency contact number across all States and Union Territories in India.',
-    category: 'emergency'
+    category: 'emergency',
+    status: 'active'
   },
   {
     id: 'childline',
@@ -85,16 +93,35 @@ export const STATUTORY_HELPLINES: HelplineItem[] = [
     portalUrl: 'https://wcd.nic.in',
     portalLabel: 'wcd.nic.in',
     notes: 'Statutory emergency protection for any child in need of care or protection under JJ Act.',
-    category: 'child'
+    category: 'child',
+    status: 'active'
   }
 ];
 
 export const LegalHelplines: React.FC<{ className?: string }> = ({ className = '' }) => {
+  const { helplines: dynamicHelplines, lastUpdatedTime } = useApp();
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const handleCopy = (id: string, num: string) => {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(num);
+  // Merge live dynamic helplines with rich static metadata
+  const activeList: HelplineItem[] = React.useMemo(() => {
+    if (!dynamicHelplines || dynamicHelplines.length === 0) return STATUTORY_HELPLINES;
+    return STATUTORY_HELPLINES.map(base => {
+      const live = dynamicHelplines.find(h => h.id === base.id || h.number === base.number);
+      if (live) {
+        return {
+          ...base,
+          status: live.status,
+          notes: live.notes || base.notes,
+          timing: live.availability_hours || base.timing
+        };
+      }
+      return base;
+    });
+  }, [dynamicHelplines]);
+
+  const handleCopy = async (id: string, num: string) => {
+    const success = await copyToClipboard(num);
+    if (success) {
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2000);
     }
@@ -106,14 +133,17 @@ export const LegalHelplines: React.FC<{ className?: string }> = ({ className = '
         <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-orange-600 dark:text-[#7C5CFF]">
           <Phone className="w-4 h-4" />
           <span>Statutory Helplines & Portals</span>
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
         </div>
-        <span className="text-xs text-slate-500 dark:text-[#777777]">
-          Official Government of India citizen helplines
-        </span>
+        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-[#777777]">
+          <span>Verified Directory</span>
+          <span>•</span>
+          <span>Last verified: <strong className="text-slate-700 dark:text-[#FFFFFF]">{lastUpdatedTime}</strong></span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {STATUTORY_HELPLINES.map(item => (
+        {activeList.map(item => (
           <div
             key={item.id}
             className="p-5 rounded-3xl liquid-glass-card flex flex-col justify-between space-y-4 hover:border-orange-500/40 dark:hover:border-[#7C5CFF]/50 transition-all"
@@ -123,9 +153,18 @@ export const LegalHelplines: React.FC<{ className?: string }> = ({ className = '
                 <span className="text-xl sm:text-2xl font-black text-orange-600 dark:text-[#7C5CFF] font-mono tracking-wider">
                   {item.number}
                 </span>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200/70 dark:bg-[#181818] border border-transparent dark:border-[#292929] text-slate-700 dark:text-[#B3B3B3]">
-                  {item.timing}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    item.status === 'active' 
+                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                      : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                  }`}>
+                    {item.status === 'active' ? '24x7 Active' : 'Maintenance'}
+                  </span>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200/70 dark:bg-[#181818] border border-transparent dark:border-[#292929] text-slate-700 dark:text-[#B3B3B3]">
+                    {item.timing}
+                  </span>
+                </div>
               </div>
 
               <h4 className="text-sm font-bold text-slate-900 dark:text-[#FFFFFF] font-display">

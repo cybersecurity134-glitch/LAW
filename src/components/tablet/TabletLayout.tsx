@@ -23,13 +23,18 @@ import {
   Check,
   PanelLeft,
   PanelLeftClose,
-  SlidersHorizontal
+  SlidersHorizontal,
+  HelpCircle,
+  History
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { copyToClipboard } from '../../utils/clipboard';
 import { CATEGORIES } from '../../data/categories';
 import { INDIAN_STATES } from '../../data/laws';
 import { LawItem } from '../../types';
 import { MOTION_EASINGS, MOTION_SPRINGS } from '../../utils/motion';
+import { searchIndexedLaws } from '../../utils/searchIndex';
+import { LawDetailAIQuickActions } from '../detail/LawDetailSections';
 
 interface TabletLayoutProps {
   isTabletLandscape: boolean; // 900px - 1199px
@@ -74,62 +79,35 @@ export const TabletLayout: React.FC<TabletLayoutProps> = ({ isTabletLandscape })
     }
   }, [activeTab]);
 
-  // Sync search query and filters with global state
+  // Sync search query and filters with global state with debounce to prevent app-wide re-render thrashing
   useEffect(() => {
-    setFilters(prev => ({
-      ...prev,
+    const timer = window.setTimeout(() => {
+      setFilters(prev => ({
+        ...prev,
+        query: searchQuery,
+        category_id: selectedCatId,
+        bailable: bailFilter,
+        cognizable: cognizableFilter,
+        state: stateFilter
+      }));
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery, selectedCatId, bailFilter, cognizableFilter, stateFilter, setFilters]);
+
+  // Compute filtered laws using high-performance search index
+  const filteredLaws = useMemo(() => {
+    let baseList = laws;
+    if (showSavedOnly) {
+      baseList = baseList.filter(l => bookmarks.includes(l.id));
+    }
+    return searchIndexedLaws(baseList, {
       query: searchQuery,
       category_id: selectedCatId,
       bailable: bailFilter,
       cognizable: cognizableFilter,
       state: stateFilter
-    }));
-  }, [searchQuery, selectedCatId, bailFilter, cognizableFilter, stateFilter, setFilters]);
-
-  // Compute filtered laws
-  const filteredLaws = useMemo(() => {
-    let list = [...laws];
-
-    if (showSavedOnly) {
-      list = list.filter(l => bookmarks.includes(l.id));
-    }
-
-    if (selectedCatId && selectedCatId !== 'all') {
-      list = list.filter(l => l.category_id === selectedCatId);
-    }
-
-    if (stateFilter && stateFilter !== 'all') {
-      list = list.filter(l => l.state_applicability === 'All India' || l.state_applicability.includes(stateFilter));
-    }
-
-    if (bailFilter !== 'all') {
-      if (bailFilter === 'bailable') list = list.filter(l => l.is_bailable === true);
-      if (bailFilter === 'non-bailable') list = list.filter(l => l.is_bailable === false);
-    }
-
-    if (cognizableFilter !== 'all') {
-      if (cognizableFilter === 'cognizable') list = list.filter(l => l.is_cognizable === true);
-      if (cognizableFilter === 'non-cognizable') list = list.filter(l => l.is_cognizable === false);
-    }
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
-      list = list.filter(l => {
-        return (
-          l.section_number.toLowerCase().includes(q) ||
-          l.section_title.toLowerCase().includes(q) ||
-          l.act_name.toLowerCase().includes(q) ||
-          (l.short_act && l.short_act.toLowerCase().includes(q)) ||
-          l.keywords.some(k => k.toLowerCase().includes(q)) ||
-          l.simple_explanation.toLowerCase().includes(q) ||
-          l.punishment.toLowerCase().includes(q) ||
-          l.fine.toLowerCase().includes(q)
-        );
-      });
-    }
-
-    return list;
-  }, [laws, selectedCatId, stateFilter, bailFilter, cognizableFilter, searchQuery, showSavedOnly, bookmarks]);
+    });
+  }, [laws, showSavedOnly, bookmarks, searchQuery, selectedCatId, bailFilter, cognizableFilter, stateFilter]);
 
   // Always maintain an active law selection when laws exist
   useEffect(() => {
@@ -150,7 +128,7 @@ export const TabletLayout: React.FC<TabletLayoutProps> = ({ isTabletLandscape })
   const activeLaw = selectedLaw || (filteredLaws.length > 0 ? filteredLaws[0] : null);
 
   const handleShare = async (law: LawItem) => {
-    const shareText = `⚖️ ${law.act_name} - ${law.section_number}: ${law.section_title}\n\nPunishment: ${law.punishment}\nFine: ${law.fine}\n\nRead on NyayaSetu: ${window.location.origin}`;
+    const shareText = `⚖️ ${law.act_name} - ${law.section_number}: ${law.section_title}\n\nPunishment: ${law.punishment}\nFine: ${law.fine}\n\nRead on LawSphere: ${window.location.origin}`;
     if (navigator.share) {
       try {
         await navigator.share({
@@ -163,8 +141,8 @@ export const TabletLayout: React.FC<TabletLayoutProps> = ({ isTabletLandscape })
         // User cancelled share
       }
     }
-    if (navigator.clipboard) {
-      await navigator.clipboard.writeText(shareText);
+    const success = await copyToClipboard(shareText);
+    if (success) {
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2000);
     }
@@ -523,36 +501,53 @@ export const TabletLayout: React.FC<TabletLayoutProps> = ({ isTabletLandscape })
           </div>
 
           {/* Laws List Scroll Area with iOS 26 Inset Cards */}
-          <div className="flex-1 overflow-y-auto p-2 sm:p-2.5 space-y-1.5 scrollbar-thin">
-            {filteredLaws.length === 0 ? (
-              <div className="p-6 text-center space-y-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 dark:bg-amber-500/20 text-amber-500 flex items-center justify-center mx-auto shadow-xs">
-                  <AlertTriangle className="w-5 h-5" />
-                </div>
-                <div className="text-xs font-bold text-slate-800 dark:text-white font-display">
-                  No laws matched
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-[#777777] leading-relaxed">
-                  Try clearing your filters or search with another legal phrase.
-                </p>
-                <button
-                  onClick={resetFilters}
-                  className="mt-1 px-3 py-1.5 rounded-full bg-orange-500 hover:bg-orange-600 dark:bg-[#7C5CFF] text-white text-xs font-semibold shadow-xs cursor-pointer"
+          <div className="flex-1 overflow-y-auto p-2 sm:p-2.5 space-y-1.5 scrollbar-thin relative">
+            <AnimatePresence mode="popLayout" initial={false}>
+              {filteredLaws.length === 0 ? (
+                <motion.div
+                  key="tablet-empty"
+                  initial={{ opacity: 0, scale: 0.96 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.96 }}
+                  transition={{ duration: 0.18 }}
+                  className="p-6 text-center space-y-2.5"
                 >
-                  Clear All Filters
-                </button>
-              </div>
-            ) : (
-              filteredLaws.map(law => {
-                const isSelected = activeLaw?.id === law.id;
-                const bookmarked = isBookmarked(law.id);
+                  <div className="w-10 h-10 rounded-2xl bg-amber-500/10 dark:bg-amber-500/20 text-amber-500 flex items-center justify-center mx-auto shadow-xs">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                  <div className="text-xs font-bold text-slate-800 dark:text-white font-display">
+                    No laws matched
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-[#777777] leading-relaxed">
+                    Try clearing your filters or search with another legal phrase.
+                  </p>
+                  <button
+                    onClick={resetFilters}
+                    className="mt-1 px-3 py-1.5 rounded-full bg-orange-500 hover:bg-orange-600 dark:bg-[#7C5CFF] text-white text-xs font-semibold shadow-xs cursor-pointer"
+                  >
+                    Clear All Filters
+                  </button>
+                </motion.div>
+              ) : (
+                filteredLaws.map(law => {
+                  const isSelected = activeLaw?.id === law.id;
+                  const bookmarked = isBookmarked(law.id);
 
-                return (
-                  <motion.div
-                    key={law.id}
-                    whileTap={{ scale: 0.985 }}
-                    onClick={() => setSelectedLaw(law)}
-                    className={`p-3 rounded-2xl cursor-pointer transition-all duration-200 relative border ${
+                  return (
+                    <motion.div
+                      key={law.id}
+                      layout="position"
+                      initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -8, scale: 0.96, transition: { duration: 0.15 } }}
+                      transition={{
+                        layout: { type: 'spring', stiffness: 350, damping: 30 },
+                        opacity: { duration: 0.22 },
+                        y: { type: 'spring', stiffness: 380, damping: 28 }
+                      }}
+                      whileTap={{ scale: 0.985 }}
+                      onClick={() => setSelectedLaw(law)}
+                      className={`p-3 rounded-2xl cursor-pointer transition-all duration-200 relative border ${
                       isSelected
                         ? 'bg-orange-500/10 dark:bg-[#7C5CFF]/15 border-orange-500/40 dark:border-[#7C5CFF]/50 shadow-[0_4px_16px_rgba(249,115,22,0.1)] dark:shadow-[0_4px_16px_rgba(124,92,255,0.15)] ring-1 ring-orange-500/20 dark:ring-[#7C5CFF]/20'
                         : 'bg-white dark:bg-[#141414] border-slate-200/80 dark:border-[#222222] hover:bg-slate-50/90 dark:hover:bg-[#181818]'
@@ -634,6 +629,7 @@ export const TabletLayout: React.FC<TabletLayoutProps> = ({ isTabletLandscape })
                 );
               })
             )}
+            </AnimatePresence>
           </div>
 
         </section>
@@ -686,7 +682,28 @@ export const TabletLayout: React.FC<TabletLayoutProps> = ({ isTabletLandscape })
                       className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 dark:from-[#7C5CFF] dark:to-[#9B82FF] text-white text-xs font-bold shadow-sm hover:opacity-95 transition-opacity cursor-pointer"
                       title="Ask AI Guide about this section"
                     >
-                      <Sparkles className="w-3.5 h-3.5" />
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="w-3.5 h-3.5 shrink-0"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-label="AI Logo"
+                        aria-hidden="true"
+                      >
+                        {/* Minimalist Corporate AI Symbol: Neural Network Node + Letter 'A' */}
+                        <path d="M12 3.5L4.5 20.5" />
+                        <path d="M12 3.5L19.5 20.5" />
+                        <path d="M7.2 14H16.8" />
+                        <path d="M12 3.5V14" />
+                        <circle cx="12" cy="3.5" r="1.6" fill="currentColor" stroke="none" />
+                        <circle cx="4.5" cy="20.5" r="1.6" fill="currentColor" stroke="none" />
+                        <circle cx="19.5" cy="20.5" r="1.6" fill="currentColor" stroke="none" />
+                        <circle cx="12" cy="14" r="1.5" fill="currentColor" stroke="none" />
+                      </svg>
                       <span>Ask AI</span>
                     </motion.button>
 
@@ -736,10 +753,47 @@ export const TabletLayout: React.FC<TabletLayoutProps> = ({ isTabletLandscape })
                 <h2 className="tablet-section-title font-extrabold text-slate-900 dark:text-white font-display mt-3 leading-snug">
                   {activeLaw.section_title}
                 </h2>
+                
+                {/* Official Name, Year Enacted & Status Meta Banner */}
+                <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs">
+                  {activeLaw.official_name && (
+                    <span className="font-semibold text-slate-700 dark:text-[#E0E0E0] bg-slate-100 dark:bg-[#1A1A1A] px-2.5 py-1 rounded-lg border border-slate-200/80 dark:border-[#282828]">
+                      {activeLaw.official_name}
+                    </span>
+                  )}
+                  {activeLaw.year_enacted && (
+                    <span className="font-medium text-slate-600 dark:text-[#A0A0A0] bg-slate-100 dark:bg-[#1A1A1A] px-2 py-1 rounded-lg border border-slate-200/80 dark:border-[#282828] flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-orange-500 dark:text-[#7C5CFF]" />
+                      <span>Enacted: {activeLaw.year_enacted}</span>
+                    </span>
+                  )}
+                  <span className={`font-semibold px-2.5 py-1 rounded-lg border text-[11px] ${
+                    activeLaw.current_status?.toLowerCase().includes('in force') || activeLaw.current_status?.toLowerCase().includes('active')
+                      ? 'bg-emerald-500/10 text-emerald-700 dark:text-[#22C55E] border-emerald-500/20'
+                      : 'bg-amber-500/10 text-amber-700 dark:text-[#F59E0B] border-amber-500/20'
+                  }`}>
+                    Status: {activeLaw.current_status || 'In Force'}
+                  </span>
+                </div>
+
+                {activeLaw.short_description && (
+                  <p className="mt-2 text-xs sm:text-sm text-slate-600 dark:text-[#B3B3B3] italic">
+                    &ldquo;{activeLaw.short_description}&rdquo;
+                  </p>
+                )}
               </div>
 
               {/* Detail Content Stream with iOS 26 Liquid Cards */}
               <div className="p-5 sm:p-6 space-y-5 max-w-4xl">
+
+                {/* AI Quick Actions Bar */}
+                <LawDetailAIQuickActions
+                  law={activeLaw}
+                  onAskAIWithPrompt={(prompt) => {
+                    setAiInitialQuestion(prompt);
+                    setShowAIAssistant(true);
+                  }}
+                />
                 
                 {/* 1. Fine & Punishment Section - Visually Prominent Dual-Column Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -789,10 +843,10 @@ export const TabletLayout: React.FC<TabletLayoutProps> = ({ isTabletLandscape })
                     {activeLaw.simple_explanation}
                   </p>
 
-                  {activeLaw.detailed_explanation && (
+                  {activeLaw.what_it_means && (
                     <div className="tablet-body-secondary pt-3 border-t border-slate-100 dark:border-[#1E1E1E] text-slate-600 dark:text-[#A0A0A0] leading-relaxed">
                       <strong className="text-slate-900 dark:text-white block mb-1">Legal Analysis:</strong>
-                      {activeLaw.detailed_explanation}
+                      {activeLaw.what_it_means}
                     </div>
                   )}
                 </div>
@@ -847,7 +901,129 @@ export const TabletLayout: React.FC<TabletLayoutProps> = ({ isTabletLandscape })
                   </div>
                 )}
 
-                {/* 5. Official Bare Act Legal Text */}
+                {/* 5. Sub-Sections & Clauses */}
+                {activeLaw.sub_sections && activeLaw.sub_sections.length > 0 && (
+                  <div className="p-5 rounded-2xl bg-white dark:bg-[#121212] border border-slate-200/90 dark:border-[#222222] shadow-xs space-y-3">
+                    <div className="tablet-card-title flex items-center gap-2 font-bold text-slate-900 dark:text-white font-display">
+                      <div className="p-1.5 rounded-lg bg-indigo-500/10 dark:bg-[#6366F1]/15 text-indigo-600 dark:text-[#6366F1]">
+                        <BookOpen className="w-4 h-4" />
+                      </div>
+                      <span>Sub-Sections & Statutory Clauses</span>
+                    </div>
+
+                    <div className="space-y-2 pt-1">
+                      {activeLaw.sub_sections.map((sub, idx) => (
+                        <div
+                          key={idx}
+                          className="tablet-list-item-text p-3 rounded-xl bg-slate-50 dark:bg-[#181818] border border-slate-200/80 dark:border-[#262626] text-slate-800 dark:text-[#EAEAEA] font-mono text-xs leading-relaxed"
+                        >
+                          {sub}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 6. Statutory Definitions */}
+                {activeLaw.definitions && activeLaw.definitions.length > 0 && (
+                  <div className="p-5 rounded-2xl bg-white dark:bg-[#121212] border border-slate-200/90 dark:border-[#222222] shadow-xs space-y-3">
+                    <div className="tablet-card-title flex items-center gap-2 font-bold text-slate-900 dark:text-white font-display">
+                      <div className="p-1.5 rounded-lg bg-cyan-500/10 dark:bg-[#06B6D4]/15 text-cyan-600 dark:text-[#06B6D4]">
+                        <HelpCircle className="w-4 h-4" />
+                      </div>
+                      <span>Statutory Definitions</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2.5 pt-1">
+                      {activeLaw.definitions.map((def, idx) => (
+                        <div
+                          key={idx}
+                          className="p-3 rounded-xl bg-slate-50 dark:bg-[#181818] border border-slate-200/80 dark:border-[#262626] space-y-1"
+                        >
+                          <div className="text-xs font-bold text-cyan-700 dark:text-cyan-400">
+                            {def.term}
+                          </div>
+                          <div className="text-xs text-slate-700 dark:text-[#B3B3B3] leading-relaxed">
+                            {def.meaning}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 7. Consequences Beyond Direct Penalties */}
+                {activeLaw.consequences && activeLaw.consequences.length > 0 && (
+                  <div className="p-5 rounded-2xl bg-white dark:bg-[#121212] border border-slate-200/90 dark:border-[#222222] shadow-xs space-y-3">
+                    <div className="tablet-card-title flex items-center gap-2 font-bold text-slate-900 dark:text-white font-display">
+                      <div className="p-1.5 rounded-lg bg-amber-500/10 dark:bg-[#F59E0B]/15 text-amber-600 dark:text-[#F59E0B]">
+                        <AlertTriangle className="w-4 h-4" />
+                      </div>
+                      <span>Collateral Consequences & Legal Impacts</span>
+                    </div>
+
+                    <div className="space-y-2 pt-1">
+                      {activeLaw.consequences.map((conseq, idx) => (
+                        <div
+                          key={idx}
+                          className="tablet-list-item-text flex items-start gap-2.5 p-3 rounded-xl bg-amber-500/10 dark:bg-[#F59E0B]/10 border border-amber-500/20 dark:border-[#F59E0B]/20 text-slate-800 dark:text-[#FFFFFF]"
+                        >
+                          <span className="w-2 h-2 rounded-full bg-amber-500 mt-1.5 shrink-0" />
+                          <span>{conseq}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 8. Amendments & Legislative History */}
+                {activeLaw.amendments && activeLaw.amendments.length > 0 && (
+                  <div className="p-5 rounded-2xl bg-white dark:bg-[#121212] border border-slate-200/90 dark:border-[#222222] shadow-xs space-y-3">
+                    <div className="tablet-card-title flex items-center gap-2 font-bold text-slate-900 dark:text-white font-display">
+                      <div className="p-1.5 rounded-lg bg-purple-500/10 dark:bg-[#A855F7]/15 text-purple-600 dark:text-[#A855F7]">
+                        <History className="w-4 h-4" />
+                      </div>
+                      <span>Amendments & Legislative History</span>
+                    </div>
+
+                    <div className="space-y-2 pt-1">
+                      {activeLaw.amendments.map((amend, idx) => (
+                        <div
+                          key={idx}
+                          className="tablet-list-item-text p-3 rounded-xl bg-purple-500/5 dark:bg-[#A855F7]/10 border border-purple-500/20 dark:border-[#A855F7]/20 text-slate-800 dark:text-[#FFFFFF] text-xs"
+                        >
+                          <span className="font-bold text-purple-700 dark:text-[#C084FC] mr-1.5">•</span>
+                          {amend}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 9. Related Laws & Statutory Codes */}
+                {activeLaw.related_laws && activeLaw.related_laws.length > 0 && (
+                  <div className="p-5 rounded-2xl bg-white dark:bg-[#121212] border border-slate-200/90 dark:border-[#222222] shadow-xs space-y-3">
+                    <div className="tablet-card-title flex items-center gap-2 font-bold text-slate-900 dark:text-white font-display">
+                      <div className="p-1.5 rounded-lg bg-blue-500/10 dark:bg-[#3B82F6]/15 text-blue-600 dark:text-[#3B82F6]">
+                        <Layers className="w-4 h-4" />
+                      </div>
+                      <span>Related Acts & Cross-Statutory Laws</span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {activeLaw.related_laws.map((relLaw, idx) => (
+                        <span
+                          key={idx}
+                          className="px-3 py-1.5 rounded-xl bg-blue-500/10 dark:bg-[#3B82F6]/15 border border-blue-500/20 dark:border-[#3B82F6]/25 text-blue-700 dark:text-[#93C5FD] text-xs font-medium"
+                        >
+                          {relLaw}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 10. Official Bare Act Legal Text */}
                 {activeLaw.official_text && (
                   <div className="p-5 rounded-2xl bg-white dark:bg-[#121212] border border-slate-200/90 dark:border-[#222222] shadow-xs space-y-3">
                     <div className="tablet-card-title flex items-center gap-2 font-bold text-slate-900 dark:text-white font-display">
@@ -867,7 +1043,7 @@ export const TabletLayout: React.FC<TabletLayoutProps> = ({ isTabletLandscape })
                   </div>
                 )}
 
-                {/* 6. Authoritative Source & Verification Info */}
+                {/* 11. Authoritative Source & Verification Info */}
                 <div className="tablet-source-info p-4 rounded-2xl bg-slate-100/90 dark:bg-[#141414] border border-slate-200 dark:border-[#252525] text-xs space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-semibold text-slate-700 dark:text-[#B3B3B3]">

@@ -1,6 +1,6 @@
 {
-  "name": "Indian Laws & Legal Information",
-  "description": "Comprehensive, modernized database of Indian laws, Acts, rules, penalties, simplified explanations, categories, and AI legal assistant.",
-  "requestFramePermissions": [],
+  "name": "LawSphere",
+  "description": "Comprehensive reference portal of Indian laws, statutory penalties, emergency helplines, legal aid guidance, law book data ingestion engine, and AI legal assistant.",
+  "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

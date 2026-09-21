@@ -14,23 +14,32 @@ import {
 import { LawItem } from '../types';
 import { useApp } from '../context/AppContext';
 import { MOTION_EASINGS } from '../utils/motion';
+import { preloadLawDetail } from '../utils/preload';
+import { prefetchLawDetail } from '../api/legalQueries';
 
 interface LawCardProps {
   law: LawItem;
   compact?: boolean;
+  isSaved?: boolean;
+  className?: string;
 }
 
-export const LawCard: React.FC<LawCardProps> = ({ law, compact = false }) => {
+const LawCardComponent: React.FC<LawCardProps> = ({ law, compact = false, isSaved, className = '' }) => {
   const { 
     openLawDetail, 
     isBookmarked, 
     toggleBookmark, 
-    explanationMode,
+    explanationMode, 
     setShowAIAssistant,
     setAiInitialQuestion
   } = useApp();
 
-  const saved = isBookmarked(law.id);
+  const saved = isSaved !== undefined ? isSaved : isBookmarked(law.id);
+
+  const handleCardInteraction = () => {
+    preloadLawDetail();
+    prefetchLawDetail(law.id);
+  };
 
   const handleBookmarkClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -44,12 +53,12 @@ export const LawCard: React.FC<LawCardProps> = ({ law, compact = false }) => {
   };
 
   return (
-    <motion.div
-      whileHover={{ y: -3, scale: 1.01 }}
-      whileTap={{ scale: 0.988 }}
-      transition={{ type: 'spring', stiffness: 450, damping: 28 }}
+    <div
       onClick={() => openLawDetail(law.id)}
-      className="group relative liquid-glass-card rounded-2xl p-3.5 sm:p-5 cursor-pointer flex flex-col justify-between hover:shadow-xl hover:border-orange-500/30 dark:hover:border-[#7C5CFF]/40 transition-colors w-full min-w-0"
+      onMouseEnter={handleCardInteraction}
+      onTouchStart={handleCardInteraction}
+      onFocus={handleCardInteraction}
+      className={`group relative liquid-glass-card rounded-2xl p-3.5 sm:p-5 cursor-pointer flex flex-col justify-between hover:shadow-xl hover:border-orange-500/30 dark:hover:border-[#7C5CFF]/40 transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.99] w-full min-w-0 ${className}`}
     >
       <div className="min-w-0">
         {/* Top Badges: Act, Section & Actions */}
@@ -60,6 +69,28 @@ export const LawCard: React.FC<LawCardProps> = ({ law, compact = false }) => {
             </span>
             <span className="text-[11px] font-semibold text-slate-700 dark:text-[#B3B3B3] liquid-pill px-2.5 py-0.5 rounded-full truncate max-w-[150px] sm:max-w-xs">
               {law.short_act || law.act_name}
+            </span>
+            {law.act_number_year && (
+              <span className="text-[10px] font-mono font-medium text-slate-500 dark:text-[#777777] hidden md:inline truncate max-w-[140px]">
+                {law.act_number_year}
+              </span>
+            )}
+            {/* Status Badge */}
+            {law.status && (
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${
+                law.status === 'In Force'
+                  ? 'bg-emerald-500/15 text-emerald-700 dark:text-[#22C55E] border-emerald-500/25 dark:border-[#22C55E]/30'
+                  : law.status === 'Superseded' || law.status === 'Repealed'
+                  ? 'bg-amber-500/15 text-amber-700 dark:text-[#F59E0B] border-amber-500/25 dark:border-[#F59E0B]/30'
+                  : 'bg-slate-500/15 text-slate-700 dark:text-[#B3B3B3] border-slate-500/25'
+              }`}>
+                {law.status}
+              </span>
+            )}
+            {/* Verification Badge */}
+            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-700 dark:text-[#60A5FA] border border-blue-500/20 dark:border-[#60A5FA]/30 shrink-0">
+              <Shield className="w-2.5 h-2.5 text-blue-600 dark:text-[#60A5FA]" />
+              <span>Verified</span>
             </span>
             {law.state_applicability !== 'All India' && (
               <span className="flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/15 dark:bg-[#EF4444]/15 text-rose-600 dark:text-[#EF4444] border border-rose-500/20 dark:border-[#EF4444]/30 shrink-0">
@@ -161,6 +192,8 @@ export const LawCard: React.FC<LawCardProps> = ({ law, compact = false }) => {
           <ChevronRight className="w-3.5 h-3.5" />
         </span>
       </div>
-    </motion.div>
+    </div>
   );
 };
+
+export const LawCard = React.memo(LawCardComponent);

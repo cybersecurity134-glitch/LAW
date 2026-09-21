@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { memo } from 'react';
 
-export const LawBackground: React.FC = () => {
+export const LawBackground: React.FC = memo(() => {
   return (
     <div 
-      className="fixed inset-0 pointer-events-none overflow-hidden z-0 select-none bg-white dark:bg-[#050505] transition-colors duration-300"
+      className="fixed inset-0 pointer-events-none overflow-hidden z-0 select-none bg-white dark:bg-[#050505] transition-colors duration-300 transform-gpu [contain:strict]"
       aria-hidden="true"
     >
       {/* 1. Ambient Judicial Caustic Glows */}
@@ -146,4 +146,4 @@ export const LawBackground: React.FC = () => {
       />
     </div>
   );
-};
+});

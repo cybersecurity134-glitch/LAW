@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { 
   Search, 
@@ -13,22 +13,32 @@ import {
   Bookmark, 
   ArrowRight,
   TrendingUp,
-  ShieldCheck
+  ShieldCheck,
+  Sliders,
+  ExternalLink,
+  FileText,
+  Radio
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { LawCard } from '../LawCard';
 import { SearchHistoryDropdown } from '../SearchHistoryDropdown';
+import { VoiceSearchButton } from '../VoiceSearchButton';
+import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
 import { CATEGORIES } from '../../data/categories';
+import { useCategoriesQuery, prefetchCategories } from '../../api/legalQueries';
 import { CitizenRightsGuide } from '../legal/CitizenRightsGuide';
 import { LegalMaxims } from '../legal/LegalMaxims';
 import { LegalHelplines } from '../legal/LegalHelplines';
 import { MOTION_EASINGS } from '../../utils/motion';
+import { preloadSearchView } from '../../utils/preload';
+import { getEffectiveVoiceLanguage } from '../../data/languages';
 
 export const HomeView: React.FC = () => {
   const { 
     user, 
     laws, 
     bookmarks, 
+    openLawDetail,
     lastUpdatedTime, 
     isRefreshing, 
     refreshLegalData, 
@@ -37,12 +47,21 @@ export const HomeView: React.FC = () => {
     setFilters,
     addRecentSearch,
     setShowOnboardingModal,
-    setShowAIAssistant
+    setShowAIAssistant,
+    updatePreferences,
+    updateHistory,
+    circulars,
+    syncStatus,
+    setShowAdminModal
   } = useApp();
+
+  const { data: categories = CATEGORIES } = useCategoriesQuery();
 
   const [searchInput, setSearchInput] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const searchBarContainerRef = useRef<HTMLDivElement>(null);
+
+  const bookmarkSet = useMemo(() => new Set(bookmarks), [bookmarks]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -95,29 +114,66 @@ export const HomeView: React.FC = () => {
     setActiveTab('search');
   };
 
+  // Voice Search integration using browser SpeechRecognition API
+  const handleVoiceResult = (transcriptText: string, isFinal: boolean) => {
+    setSearchInput(transcriptText);
+
+    if (isFinal && transcriptText.trim()) {
+      const trimmed = transcriptText.trim();
+      addRecentSearch(trimmed);
+      setFilters(prev => ({ ...prev, query: trimmed }));
+      setIsSearchFocused(false);
+      setActiveTab('search');
+    }
+  };
+
+  // Dynamically resolve regional Indian voice search language from user profile settings
+  const activeVoiceLanguage = useMemo(() => {
+    return getEffectiveVoiceLanguage(user?.preferences);
+  }, [user?.preferences]);
+
+  const {
+    isListening: isVoiceListening,
+    isSupported: isVoiceSupported,
+    error: voiceError,
+    toggleListening: toggleVoiceSearch,
+    clearError: clearVoiceError
+  } = useSpeechRecognition({
+    onResult: handleVoiceResult,
+    lang: activeVoiceLanguage.code
+  });
+
   // Recommended Laws based on user preferences (State, Interests)
   const userState = user?.preferences?.state || 'Telangana';
   const userInterests = user?.preferences?.interests || [];
 
-  const recommendedLaws = laws.filter(l => {
-    const matchesState = l.state_applicability === 'All India' || l.state_applicability.includes(userState);
-    const catName = CATEGORIES.find(c => c.id === l.category_id)?.name || '';
-    const matchesCategory = userInterests.length === 0 || userInterests.some(interest => 
-      catName.toLowerCase().includes(interest.toLowerCase().slice(0, 5)) ||
-      l.keywords.some(k => interest.toLowerCase().includes(k.toLowerCase())) ||
-      l.category_id.toLowerCase().includes(interest.toLowerCase().slice(0, 5))
-    );
-    return matchesState && (matchesCategory || l.featured);
-  }).slice(0, 4);
+  const recommendedLaws = useMemo(() => {
+    return laws.filter(l => {
+      const matchesState = l.state_applicability === 'All India' || l.state_applicability.includes(userState);
+      const catName = CATEGORIES.find(c => c.id === l.category_id)?.name || '';
+      const matchesCategory = userInterests.length === 0 || userInterests.some(interest => 
+        catName.toLowerCase().includes(interest.toLowerCase().slice(0, 5)) ||
+        l.keywords.some(k => interest.toLowerCase().includes(k.toLowerCase())) ||
+        l.category_id.toLowerCase().includes(interest.toLowerCase().slice(0, 5))
+      );
+      return matchesState && (matchesCategory || l.featured);
+    }).slice(0, 4);
+  }, [laws, userState, userInterests]);
 
   // Recently updated/amended laws
-  const recentlyUpdatedLaws = laws.filter(l => l.is_recently_updated).slice(0, 4);
+  const recentlyUpdatedLaws = useMemo(() => {
+    return laws.filter(l => l.is_recently_updated).slice(0, 4);
+  }, [laws]);
 
   // Popular laws
-  const popularLaws = laws.filter(l => l.featured || (l.view_count && l.view_count > 10000)).slice(0, 4);
+  const popularLaws = useMemo(() => {
+    return laws.filter(l => l.featured || (l.view_count && l.view_count > 10000)).slice(0, 4);
+  }, [laws]);
 
   // Bookmarked laws
-  const bookmarkedLaws = laws.filter(l => bookmarks.includes(l.id));
+  const bookmarkedLaws = useMemo(() => {
+    return laws.filter(l => bookmarks.includes(l.id));
+  }, [laws, bookmarks]);
 
   // Quick suggestions
   const suggestions = [
@@ -245,22 +301,43 @@ export const HomeView: React.FC = () => {
               type="text"
               value={searchInput}
               onChange={e => setSearchInput(e.target.value)}
-              onFocus={() => setIsSearchFocused(true)}
-              placeholder="Search by law, section number (e.g. 'Section 66', 'BNS 103'), offence, or fine..."
-              className={`w-full pl-12 pr-28 py-3.5 rounded-full liquid-pill text-sm text-slate-900 dark:text-[#FFFFFF] placeholder-slate-500 dark:placeholder-[#777777] focus:outline-none transition-all duration-200 dark:bg-[#151515] ${
+              onFocus={() => {
+                setIsSearchFocused(true);
+                preloadSearchView();
+              }}
+              onMouseEnter={preloadSearchView}
+              placeholder={
+                isVoiceListening
+                  ? `Listening in ${activeVoiceLanguage.nativeName} (${activeVoiceLanguage.name})... Speak law or section`
+                  : `Search laws or speak in ${activeVoiceLanguage.nativeName} (e.g. '66D', 'धारा 420', 'Bail rules')...`
+              }
+              className={`w-full pl-12 pr-44 py-3.5 rounded-full liquid-pill text-sm text-slate-900 dark:text-[#FFFFFF] placeholder-slate-500 dark:placeholder-[#777777] focus:outline-none transition-all duration-200 dark:bg-[#151515] ${
                 isSearchFocused 
                   ? 'ring-2 ring-orange-500/50 dark:ring-[#7C5CFF]/60 shadow-lg shadow-orange-500/10 dark:shadow-[#7C5CFF]/15 border-orange-500/40 dark:border-[#7C5CFF]/50'
                   : 'dark:border-[#292929]'
               }`}
             />
-            <motion.button
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.95 }}
-              type="submit"
-              className="absolute right-2 top-2 px-5 py-2 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 dark:from-[#7C5CFF] dark:to-[#6847ed] dark:hover:from-[#6b4ae0] dark:hover:to-[#5837db] text-white font-bold text-xs shadow-md shadow-orange-500/25 dark:shadow-[#7C5CFF]/30 cursor-pointer ring-1 ring-white/20 dark:ring-white/10 z-10"
-            >
-              Search
-            </motion.button>
+            <div className="absolute right-2 top-2 flex items-center gap-1.5 z-10">
+              <VoiceSearchButton
+                isListening={isVoiceListening}
+                isSupported={isVoiceSupported}
+                onToggle={toggleVoiceSearch}
+                error={voiceError}
+                onDismissError={clearVoiceError}
+                activeLanguage={activeVoiceLanguage}
+                onLanguageChange={(code) => updatePreferences({ voice_language: code })}
+                showLanguageSelector={true}
+                size="sm"
+              />
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.95 }}
+                type="submit"
+                className="px-5 py-2 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 dark:from-[#7C5CFF] dark:to-[#6847ed] dark:hover:from-[#6b4ae0] dark:hover:to-[#5837db] text-white font-bold text-xs shadow-md shadow-orange-500/25 dark:shadow-[#7C5CFF]/30 cursor-pointer ring-1 ring-white/20 dark:ring-white/10"
+              >
+                Search
+              </motion.button>
+            </div>
           </form>
 
           {/* Quick-Access Search History Dropdown on Focus */}
@@ -269,6 +346,7 @@ export const HomeView: React.FC = () => {
             onClose={() => setIsSearchFocused(false)}
             currentQuery={searchInput}
             onSelectTerm={handleSelectHistoryTerm}
+            onSelectLaw={openLawDetail}
             popularSuggestions={suggestions}
           />
 
@@ -360,27 +438,46 @@ export const HomeView: React.FC = () => {
 
       {/* Sync Status & Live Refresh Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-2xl liquid-glass-card text-xs">
-        <div className="flex items-center gap-2 text-slate-600 dark:text-[#B3B3B3]">
-          <ShieldCheck className="w-4 h-4 text-emerald-500 dark:text-[#22C55E]" />
-          <span>
-            Database verified against <strong className="text-slate-900 dark:text-[#FFFFFF]">India Code & Gazette of India</strong>.
-          </span>
-          <span className="hidden sm:inline text-slate-300 dark:text-[#292929]">|</span>
+        <div className="flex items-center gap-2 text-slate-600 dark:text-[#B3B3B3] flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <ShieldCheck className="w-4 h-4 text-emerald-500 dark:text-[#22C55E]" />
+            <span className="font-semibold text-slate-900 dark:text-[#FFFFFF]">
+              {syncStatus?.status === 'synced' ? 'Live Gazette Verified' : 'Official Repositories Synced'}
+            </span>
+          </div>
+          <span className="text-slate-300 dark:text-[#292929]">|</span>
           <span className="text-slate-500 dark:text-[#777777] text-[11px]">
             Last updated: <strong className="text-slate-700 dark:text-[#FFFFFF]">{lastUpdatedTime}</strong>
           </span>
+          <span className="hidden md:inline-block px-2 py-0.5 rounded-full font-mono text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">
+            24h Daily Automated Cycle Active
+          </span>
         </div>
 
-        <motion.button
-          whileHover={{ scale: 1.03 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={refreshLegalData}
-          disabled={isRefreshing}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-orange-500/10 dark:bg-[#7C5CFF]/15 hover:bg-orange-500/20 dark:hover:bg-[#7C5CFF]/25 text-orange-600 dark:text-[#7C5CFF] border border-orange-500/20 dark:border-[#7C5CFF]/30 font-semibold transition-colors disabled:opacity-50 cursor-pointer"
-        >
-          <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-orange-500 dark:text-[#7C5CFF]' : ''}`} />
-          <span>{isRefreshing ? 'Verifying Gazettes...' : 'Live Refresh'}</span>
-        </motion.button>
+        <div className="flex items-center gap-2">
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setShowAdminModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-100 dark:bg-neutral-800/80 hover:bg-neutral-200 dark:hover:bg-neutral-700/80 text-slate-700 dark:text-[#CCCCCC] border border-neutral-300 dark:border-neutral-700 font-semibold transition-colors cursor-pointer text-xs"
+            title="Open Admin Override and Automated 24h Scheduler Panel"
+          >
+            <Sliders className="w-3.5 h-3.5 text-amber-500" />
+            <span>Admin Override</span>
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={refreshLegalData}
+            disabled={isRefreshing}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-orange-500/10 dark:bg-[#7C5CFF]/15 hover:bg-orange-500/20 dark:hover:bg-[#7C5CFF]/25 text-orange-600 dark:text-[#7C5CFF] border border-orange-500/20 dark:border-[#7C5CFF]/30 font-semibold transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-orange-500 dark:text-[#7C5CFF]' : ''}`} />
+            <span>{isRefreshing ? 'Verifying Gazettes...' : 'Live Refresh'}</span>
+          </motion.button>
+        </div>
       </div>
 
       {/* Top 6 Quick Categories */}
@@ -389,45 +486,50 @@ export const HomeView: React.FC = () => {
           <div className="flex items-center gap-2 font-bold text-base sm:text-lg text-slate-900 dark:text-[#FFFFFF] font-display">
             <Layers className="w-5 h-5 text-orange-500 dark:text-[#7C5CFF]" />
             <span>Legal Categories</span>
-            <span className="text-xs font-normal text-slate-500 dark:text-[#777777]">(22 Enactments)</span>
+            <span className="text-xs font-normal text-slate-500 dark:text-[#777777]">({categories.length} Enactments)</span>
           </div>
           <motion.button
             whileHover={{ x: 2 }}
+            onMouseEnter={prefetchCategories}
             onClick={() => setActiveTab('categories')}
             className="text-xs font-semibold text-orange-600 dark:text-[#7C5CFF] hover:underline flex items-center gap-1 cursor-pointer"
           >
-            <span>Browse All 22</span>
+            <span>Browse All {categories.length}</span>
             <ChevronRight className="w-3.5 h-3.5" />
           </motion.button>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-          {CATEGORIES.slice(0, 6).map(cat => (
-            <motion.div
-              key={cat.id}
-              whileHover={{ y: -2, scale: 1.015 }}
-              whileTap={{ scale: 0.98 }}
-              transition={{ type: 'spring', stiffness: 450, damping: 25 }}
-              onClick={() => {
-                setSelectedCategory(cat.id);
-                setActiveTab('categories');
-              }}
-              className="p-3.5 rounded-2xl liquid-glass-card cursor-pointer flex flex-col justify-between group hover:border-orange-500/30 dark:hover:border-[#7C5CFF]/30 transition-colors"
-            >
-              <div>
-                <div className="text-xs font-bold text-slate-900 dark:text-[#FFFFFF] group-hover:text-orange-500 dark:group-hover:text-[#7C5CFF] transition-colors">
-                  {cat.name}
+          {categories.slice(0, 6).map(cat => {
+            const catLawCount = laws.filter(l => l.category_id === cat.id).length;
+            return (
+              <motion.div
+                key={cat.id}
+                whileHover={{ y: -2, scale: 1.015 }}
+                whileTap={{ scale: 0.98 }}
+                onMouseEnter={prefetchCategories}
+                transition={{ type: 'spring', stiffness: 450, damping: 25 }}
+                onClick={() => {
+                  setSelectedCategory(cat.id);
+                  setActiveTab('categories');
+                }}
+                className="p-3.5 rounded-2xl liquid-glass-card cursor-pointer flex flex-col justify-between group hover:border-orange-500/30 dark:hover:border-[#7C5CFF]/30 transition-colors"
+              >
+                <div>
+                  <div className="text-xs font-bold text-slate-900 dark:text-[#FFFFFF] group-hover:text-orange-500 dark:group-hover:text-[#7C5CFF] transition-colors">
+                    {cat.name}
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-[#777777] mt-1 line-clamp-2">
+                    {cat.description}
+                  </div>
                 </div>
-                <div className="text-[11px] text-slate-500 dark:text-[#777777] mt-1 line-clamp-2">
-                  {cat.description}
+                <div className="mt-3 flex items-center justify-between text-[10px] font-bold text-orange-600 dark:text-[#7C5CFF]">
+                  <span className="font-mono">{catLawCount === 0 ? '0' : `${catLawCount} Laws`}</span>
+                  <ChevronRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
                 </div>
-              </div>
-              <div className="mt-3 flex items-center justify-between text-[10px] font-bold text-orange-600 dark:text-[#7C5CFF]">
-                <span>{cat.sections_count} Sections</span>
-                <ChevronRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            );
+          })}
         </div>
       </div>
 
@@ -453,14 +555,14 @@ export const HomeView: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {recommendedLaws.map(law => (
-            <LawCard key={law.id} law={law} />
+            <LawCard key={law.id} law={law} isSaved={bookmarkSet.has(law.id)} />
           ))}
         </div>
       </div>
 
-      {/* Recently Updated / Amended Laws (featuring BNS 2023, BNSS 2023) */}
+      {/* Recently Updated / Amended Laws & Live Gazette Changes */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center gap-2 font-bold text-base sm:text-lg text-slate-900 dark:text-[#FFFFFF] font-display">
             <TrendingUp className="w-5 h-5 text-emerald-500 dark:text-[#22C55E]" />
             <span>Recently Amended & New Enactments</span>
@@ -468,14 +570,136 @@ export const HomeView: React.FC = () => {
               2024–2026 Reforms
             </span>
           </div>
+          <div className="flex items-center gap-2 text-xs text-muted">
+            <Clock className="w-3.5 h-3.5" />
+            <span>Last updated: <strong className="text-slate-800 dark:text-slate-200">{lastUpdatedTime}</strong></span>
+          </div>
         </div>
+
+        {/* Live Gazette Change Cards from Dynamic Sync Engine */}
+        {updateHistory.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {updateHistory.slice(0, 3).map((upd) => (
+              <div 
+                key={upd.id}
+                className="p-4 rounded-2xl liquid-glass-card border flex flex-col justify-between space-y-3 hover:border-emerald-500/30 transition-all"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-[#FFFFFF] block">
+                        {upd.act_name}
+                      </span>
+                      <span className="text-xs font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
+                        {upd.section}
+                      </span>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 whitespace-nowrap">
+                        {upd.change_type}
+                      </span>
+                      {upd.is_urgent && (
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400">
+                          Critical
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-600 dark:text-[#B3B3B3] mt-2 leading-relaxed line-clamp-3">
+                    {upd.description}
+                  </p>
+                </div>
+
+                <div className="pt-2 border-t border-slate-200/50 dark:border-neutral-800 flex items-center justify-between text-[11px] text-muted font-mono">
+                  <span>Eff: {upd.effective_date}</span>
+                  {upd.source_url && (
+                    <a
+                      href={upd.source_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
+                    >
+                      Gazette <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {recentlyUpdatedLaws.map(law => (
-            <LawCard key={law.id} law={law} />
+            <LawCard key={law.id} law={law} isSaved={bookmarkSet.has(law.id)} />
           ))}
         </div>
       </div>
+
+      {/* Official Ministry Circulars & Public Legal Directives */}
+      {circulars.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2 font-bold text-base sm:text-lg text-slate-900 dark:text-[#FFFFFF] font-display">
+              <Radio className="w-5 h-5 text-amber-500 animate-pulse" />
+              <span>Official Ministry Circulars & Gazette Directives</span>
+              <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                Live Public Notices
+              </span>
+            </div>
+            <div className="text-xs text-muted">
+              Last synchronized: <strong className="text-slate-800 dark:text-slate-200">{lastUpdatedTime}</strong>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            {circulars.slice(0, 4).map((circ) => (
+              <div 
+                key={circ.id}
+                className="p-4 rounded-2xl liquid-glass-card border flex flex-col justify-between space-y-3 hover:border-amber-500/30 transition-all"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h4 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-[#FFFFFF]">
+                        {circ.title}
+                      </h4>
+                      <div className="flex items-center gap-2 text-[11px] text-muted font-mono mt-0.5">
+                        <span>{circ.issuing_authority}</span>
+                        <span>•</span>
+                        <span>{circ.circular_number}</span>
+                      </div>
+                    </div>
+                    {circ.is_critical && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 whitespace-nowrap">
+                        Priority
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-slate-600 dark:text-[#B3B3B3] mt-2.5 leading-relaxed">
+                    {circ.summary}
+                  </p>
+                </div>
+
+                <div className="pt-2 border-t border-slate-200/50 dark:border-neutral-800 flex items-center justify-between text-[11px] text-muted font-mono">
+                  <span>Issued: {circ.issue_date}</span>
+                  {circ.source_url && (
+                    <a
+                      href={circ.source_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 font-sans font-medium"
+                    >
+                      Official Directive <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Popular Laws */}
       <div className="space-y-4">
@@ -498,7 +722,7 @@ export const HomeView: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {popularLaws.map(law => (
-            <LawCard key={law.id} law={law} />
+            <LawCard key={law.id} law={law} isSaved={bookmarkSet.has(law.id)} />
           ))}
         </div>
       </div>
@@ -522,7 +746,7 @@ export const HomeView: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {bookmarkedLaws.slice(0, 2).map(law => (
-              <LawCard key={law.id} law={law} />
+              <LawCard key={law.id} law={law} isSaved={bookmarkSet.has(law.id)} />
             ))}
           </div>
         </div>

@@ -569,142 +569,136 @@
 }
 
 /* ==========================================================================
-   Liquid Optical Blur & Depth Transition Engine (Opening Blur Effects)
+   Liquid Optical Depth & Hardware-Accelerated Transition Engine
+   60 FPS GPU-Composited Transitions (transform & opacity only)
    ========================================================================== */
 
-/* 1. Backdrop Frosted Blur Animation */
-@keyframes backdrop-open-blur {
+/* 1. Backdrop Frosted Fade Animation (Static blur, hardware opacity fade) */
+@keyframes backdrop-fade-in {
   0% {
     opacity: 0;
-    backdrop-filter: blur(0px) saturate(100%);
-    -webkit-backdrop-filter: blur(0px) saturate(100%);
   }
   100% {
     opacity: 1;
-    backdrop-filter: blur(28px) saturate(190%);
-    -webkit-backdrop-filter: blur(28px) saturate(190%);
   }
 }
 
 .modal-backdrop-blur {
   background-color: rgba(15, 23, 42, 0.65);
-  backdrop-filter: blur(28px) saturate(190%);
-  -webkit-backdrop-filter: blur(28px) saturate(190%);
-  animation: backdrop-open-blur 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  will-change: backdrop-filter, opacity;
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  will-change: opacity;
 }
 
 .dark .modal-backdrop-blur {
   background-color: rgba(5, 5, 5, 0.85);
-  backdrop-filter: blur(32px) saturate(180%);
-  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(170%);
+  -webkit-backdrop-filter: blur(20px) saturate(170%);
 }
 
-/* 2. Modal Card Blur-to-Focus Opening Animation */
-@keyframes modal-card-open-blur {
+/* 2. Modal Card Hardware-Accelerated Opening Animation (translate3d + scale + opacity) */
+@keyframes modal-card-open-hardware {
   0% {
     opacity: 0;
-    filter: blur(16px);
-    transform: scale(0.93) translateY(24px);
-  }
-  50% {
-    filter: blur(4px);
+    transform: translate3d(0, 16px, 0) scale(0.97);
   }
   100% {
     opacity: 1;
-    filter: blur(0px);
-    transform: scale(1) translateY(0);
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
 .modal-card-open {
-  animation: modal-card-open-blur 0.36s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  will-change: transform, opacity, filter;
+  animation: modal-card-open-hardware 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+  transform: translate3d(0, 0, 0);
 }
 
-/* 3. Underlying App Content Background Blur (Depth Field when anything is opened) */
+/* 3. Underlying App Content Background Depth (Zero heavy blur, purely composited) */
 .app-modal-blur-active {
-  filter: blur(10px) brightness(0.92);
-  transform: scale(0.985);
+  opacity: 0.96;
+  transform: scale(0.992) translate3d(0, 0, 0);
   transform-origin: center top;
-  transition: filter 0.38s cubic-bezier(0.16, 1, 0.3, 1), 
-              transform 0.38s cubic-bezier(0.16, 1, 0.3, 1),
-              opacity 0.38s ease;
+  transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
   pointer-events: none;
-  will-change: filter, transform;
+  will-change: transform, opacity;
 }
 
 .app-modal-blur-inactive {
-  filter: blur(0px) brightness(1);
-  transform: scale(1);
+  opacity: 1;
+  transform: scale(1) translate3d(0, 0, 0);
   transform-origin: center top;
-  transition: filter 0.35s cubic-bezier(0.16, 1, 0.3, 1), 
-              transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: filter, transform;
+  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
 }
 
-/* 4. Screen View Transition with Blur-In Focus */
-@keyframes view-open-blur {
+/* 4. Screen View Transition (GPU composited 60 FPS translation & fade) */
+@keyframes view-hardware-open {
   0% {
     opacity: 0;
-    filter: blur(10px);
-    transform: translateY(8px) scale(0.99);
+    transform: translate3d(0, 6px, 0);
   }
   100% {
     opacity: 1;
-    filter: blur(0px);
-    transform: translateY(0) scale(1);
+    transform: translate3d(0, 0, 0);
   }
 }
 
 .view-blur-open {
-  animation: view-open-blur 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  will-change: filter, opacity, transform;
+  animation: view-hardware-open 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
 }
 
-/* 5. Dropdown & Popover Blur-in Focus */
-@keyframes popover-open-blur {
+/* 5. Dropdown & Popover Hardware Focus */
+@keyframes popover-hardware-open {
   0% {
     opacity: 0;
-    filter: blur(12px);
-    transform: scale(0.94) translateY(-10px);
+    transform: translate3d(0, -6px, 0) scale(0.96);
   }
   100% {
     opacity: 1;
-    filter: blur(0px);
-    transform: scale(1) translateY(0);
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
 .popover-blur-open {
-  animation: popover-open-blur 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  will-change: filter, opacity, transform;
+  animation: popover-hardware-open 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
 }
 
-/* 6. Accordion and Drawer Expansion Blur-to-Focus */
-@keyframes accordion-open-blur {
+/* 6. Accordion and Drawer Expansion */
+@keyframes accordion-hardware-open {
   0% {
     opacity: 0;
-    filter: blur(8px);
-    transform: translateY(-6px);
+    transform: translate3d(0, -4px, 0);
   }
   100% {
     opacity: 1;
-    filter: blur(0px);
-    transform: translateY(0);
+    transform: translate3d(0, 0, 0);
   }
 }
 
 .accordion-open-blur {
-  animation: accordion-open-blur 0.26s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  will-change: filter, opacity, transform;
+  animation: accordion-hardware-open 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
 }
 
-/* 7. Mobile Drawer Opening with Blur Entrance */
+/* 7. Mobile Drawer Opening with Hardware Entrance */
+@keyframes drawer-hardware-open {
+  0% {
+    opacity: 0;
+    transform: translate3d(-12px, 0, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
 .drawer-blur-open {
-  animation: modal-card-open-blur 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  will-change: filter, transform, opacity;
+  animation: drawer-hardware-open 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
 }
 
 /* ==========================================================================

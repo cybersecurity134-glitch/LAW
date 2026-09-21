@@ -1,6 +1,8 @@
 import React from 'react';
+import { motion } from 'motion/react';
 import { Home, Search, Layers, Bookmark, Menu } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { preloadTab } from '../utils/preload';
 
 interface NavItem {
   id: 'home' | 'search' | 'categories' | 'saved' | 'profile';
@@ -47,7 +49,7 @@ const MOBILE_THEMES: Record<string, { activeText: string; indicator: string; bad
   }
 };
 
-export const BottomNav: React.FC = () => {
+const BottomNavComponent: React.FC = () => {
   const { activeTab, setActiveTab, bookmarks } = useApp();
 
   const navItems: NavItem[] = [
@@ -67,12 +69,17 @@ export const BottomNav: React.FC = () => {
           const theme = MOBILE_THEMES[item.id] || MOBILE_THEMES.home;
 
           return (
-            <button
+            <motion.button
               key={item.id}
+              whileTap={{ scale: 0.90 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 28 }}
               onClick={() => setActiveTab(item.id)}
-              className={`relative flex flex-col items-center justify-center min-h-[48px] py-1 gap-1 transition-all duration-200 cursor-pointer ${
+              onMouseEnter={() => preloadTab(item.id)}
+              onTouchStart={() => preloadTab(item.id)}
+              onFocus={() => preloadTab(item.id)}
+              className={`relative flex flex-col items-center justify-center min-h-[48px] py-1 gap-1 transition-colors duration-150 cursor-pointer select-none ${
                 isActive 
-                  ? `${theme.activeText} scale-105 dark:text-[#7C5CFF]` 
+                  ? `${theme.activeText} dark:text-[#7C5CFF]` 
                   : 'text-slate-500 dark:text-[#777777] hover:text-slate-900 dark:hover:text-[#FFFFFF]'
               }`}
             >
@@ -94,10 +101,12 @@ export const BottomNav: React.FC = () => {
               {isActive && (
                 <div className={`absolute bottom-0.5 w-7 h-1 rounded-full ${theme.indicator} dark:bg-[#7C5CFF] dark:shadow-[0_0_8px_rgba(124,92,255,0.8)] animate-pulse`} />
               )}
-            </button>
+            </motion.button>
           );
         })}
       </div>
     </nav>
   );
 };
+
+export const BottomNav = React.memo(BottomNavComponent);

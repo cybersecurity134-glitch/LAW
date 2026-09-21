@@ -11,12 +11,14 @@ import {
   Sparkles,
   Sun,
   Moon,
-  Info
+  Info,
+  Mic
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { INDIAN_STATES } from '../data/laws';
 import { UserPreferences } from '../types';
 import { modalCardVariants, MOTION_EASINGS } from '../utils/motion';
+import { SUPPORTED_REGIONAL_LANGUAGES, getEffectiveVoiceLanguage } from '../data/languages';
 
 export const OnboardingModal: React.FC = () => {
   const { 
@@ -26,8 +28,11 @@ export const OnboardingModal: React.FC = () => {
     completeOnboarding 
   } = useApp();
 
-  const [age, setAge] = useState<number>(user?.preferences?.age || 26);
+  const [age, setAge] = useState<string | number>(user?.preferences?.age !== undefined ? user.preferences.age : 26);
   const [state, setState] = useState<string>(user?.preferences?.state || 'Telangana');
+  const [voiceLang, setVoiceLang] = useState<string>(
+    user?.preferences?.voice_language || getEffectiveVoiceLanguage({ state: user?.preferences?.state || 'Telangana' }).code
+  );
   const [genderPref, setGenderPref] = useState<string>(user?.preferences?.gender_pref || 'Not Specified');
   const [occupation, setOccupation] = useState<string>(user?.preferences?.occupation || 'Working Professional');
   const [interests, setInterests] = useState<string[]>(
@@ -69,14 +74,16 @@ export const OnboardingModal: React.FC = () => {
   };
 
   const handleSave = () => {
+    const numericAge = typeof age === 'number' ? age : (parseInt(age, 10) || 0);
     const updatedPrefs: UserPreferences = {
-      age,
+      age: numericAge,
       state,
       gender_pref: genderPref,
       occupation,
       interests,
       explanation_mode: mode,
-      theme
+      theme,
+      voice_language: voiceLang
     };
     completeOnboarding(updatedPrefs);
   };
@@ -139,7 +146,12 @@ export const OnboardingModal: React.FC = () => {
             </p>
             <select
               value={state}
-              onChange={e => setState(e.target.value)}
+              onChange={e => {
+                const newState = e.target.value;
+                setState(newState);
+                const suggested = getEffectiveVoiceLanguage({ state: newState });
+                setVoiceLang(suggested.code);
+              }}
               className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-[#151515] border border-slate-200 dark:border-[#292929] text-sm text-slate-800 dark:text-[#FFFFFF] font-medium focus:bg-white dark:focus:bg-[#151515] focus:border-orange-500 dark:focus:border-[#7C5CFF] focus:outline-none"
             >
               {INDIAN_STATES.map(st => (
@@ -155,17 +167,18 @@ export const OnboardingModal: React.FC = () => {
             
             {/* Age */}
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-800 dark:text-[#FFFFFF] uppercase tracking-wider">
+              <label htmlFor="user-age-input" className="text-xs font-bold text-slate-800 dark:text-[#FFFFFF] uppercase tracking-wider">
                 Age
               </label>
               <div className="flex items-center gap-3">
                 <input
+                  id="user-age-input"
                   type="number"
-                  min={14}
-                  max={100}
+                  inputMode="numeric"
                   value={age}
-                  onChange={e => setAge(parseInt(e.target.value) || 25)}
-                  className="w-24 px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-[#151515] border border-slate-200 dark:border-[#292929] text-sm font-bold text-slate-800 dark:text-[#FFFFFF] focus:bg-white dark:focus:bg-[#151515] focus:outline-none focus:border-orange-500 dark:focus:border-[#7C5CFF]"
+                  placeholder="e.g. 26"
+                  onChange={e => setAge(e.target.value)}
+                  className="w-28 sm:w-32 px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-[#151515] border border-slate-200 dark:border-[#292929] text-sm font-bold text-slate-800 dark:text-[#FFFFFF] focus:bg-white dark:focus:bg-[#151515] focus:outline-none focus:border-orange-500 dark:focus:border-[#7C5CFF] focus:ring-2 focus:ring-orange-500/20 dark:focus:ring-[#7C5CFF]/20 transition-all"
                 />
                 <span className="text-xs text-slate-500 dark:text-[#777777]">
                   Used to highlight juvenile, driving, or senior citizen provisions.
@@ -321,6 +334,44 @@ export const OnboardingModal: React.FC = () => {
               </div>
             </div>
 
+          </div>
+
+          {/* 6. Voice Search Language (Regional Indian Languages) */}
+          <div className="space-y-2 pt-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-800 dark:text-[#FFFFFF] uppercase tracking-wider flex items-center gap-1.5">
+                <Mic className="w-3.5 h-3.5 text-orange-500 dark:text-[#7C5CFF]" />
+                <span>Voice Search Regional Language</span>
+              </label>
+              <span className="text-[10px] text-slate-500 dark:text-[#888888]">
+                Native Speech Recognition & Indic Numerals
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+              {SUPPORTED_REGIONAL_LANGUAGES.map(lang => {
+                const isSelected = lang.code.toLowerCase() === voiceLang.toLowerCase();
+                return (
+                  <button
+                    key={lang.code}
+                    type="button"
+                    onClick={() => setVoiceLang(lang.code)}
+                    className={`p-2.5 rounded-2xl border text-xs font-medium text-left transition-all cursor-pointer flex flex-col justify-between ${
+                      isSelected
+                        ? 'bg-orange-500 dark:bg-[#7C5CFF] text-white border-orange-500 dark:border-[#7C5CFF] shadow-md shadow-orange-500/20 dark:shadow-[#7C5CFF]/25'
+                        : 'bg-white dark:bg-[#181818] border-slate-200 dark:border-[#292929] text-slate-700 dark:text-[#B3B3B3] hover:text-slate-900 dark:hover:text-[#FFFFFF] hover:bg-slate-50 dark:hover:bg-[#202020]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span className="font-bold truncate text-xs">{lang.name}</span>
+                      {isSelected && <Check className="w-3 h-3 text-white shrink-0 ml-1" />}
+                    </div>
+                    <span className={`text-[10px] truncate ${isSelected ? 'text-white/90' : 'text-slate-400 dark:text-[#777777]'}`}>
+                      {lang.nativeName}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Submit Action */}

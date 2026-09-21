@@ -43,32 +43,36 @@ export const prefersReducedMotion = (): boolean => {
 // MOTION VARIANTS
 // ============================================================================
 
-// 1. Page / Route Transition
-export const pageVariants = {
+// 1. Page / Route Transition - Refined with subtle spring physics for instant, fluid navigation
+export const tabSpringVariants = {
   initial: {
     opacity: 0,
-    y: 12,
-    scale: 0.985,
+    y: 8,
+    scale: 0.995,
   },
   animate: {
     opacity: 1,
     y: 0,
     scale: 1,
     transition: {
-      duration: MOTION_DURATIONS.smooth,
-      ease: MOTION_EASINGS.appleDecel,
+      type: 'spring' as const,
+      stiffness: 440,
+      damping: 30,
+      mass: 0.8,
     },
   },
   exit: {
     opacity: 0,
-    y: -8,
-    scale: 0.99,
+    y: -6,
+    scale: 0.995,
     transition: {
-      duration: MOTION_DURATIONS.normal,
+      duration: 0.12,
       ease: MOTION_EASINGS.accelerate,
     },
   },
 };
+
+export const pageVariants = tabSpringVariants;
 
 // 2. Modal Backdrop and Content
 export const modalBackdropVariants = {
@@ -151,7 +155,7 @@ export const drawerVariants = {
     x: 0,
     opacity: 1,
     transition: {
-      type: 'spring',
+      type: 'spring' as const,
       damping: 32,
       stiffness: 340,
     },
@@ -227,3 +231,31 @@ export const toastVariants = {
     },
   },
 };
+
+// 8. Search Result Item Entry/Exit/Layout Variants
+export const searchResultItemVariants = {
+  initial: {
+    opacity: 0,
+    y: 16,
+    scale: 0.97,
+  },
+  animate: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: MOTION_DURATIONS.normal,
+      ease: MOTION_EASINGS.appleDecel,
+    },
+  },
+  exit: {
+    opacity: 0,
+    y: -10,
+    scale: 0.94,
+    transition: {
+      duration: 0.16,
+      ease: MOTION_EASINGS.accelerate,
+    },
+  },
+};
+

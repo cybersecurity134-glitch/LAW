@@ -191,8 +191,18 @@ export const CATEGORIES: LawCategory[] = [
     sections_count: 76
   },
   {
+    id: 'state-specific-legislation',
+    name: 'State-Specific Legislation',
+    icon_name: 'MapPin',
+    description: 'State acts, local police acts, land revenue codes, municipal regulations, and state-level subordinate rules kept distinct from Central Acts.',
+    color: 'amber',
+    acts_count: 4,
+    sections_count: 140,
+    primary_acts: ['Telangana Motor Vehicles Rules', 'Delhi Police Act', 'Maharashtra Land Revenue Code', 'State Rent Control Acts']
+  },
+  {
     id: 'other-laws',
-    name: 'Other Laws',
+    name: 'Other Laws & Sectoral Statutes',
     icon_name: 'Layers',
     description: 'Special and local enactments, disaster management, sports law, maritime law, and miscellaneous statutes.',
     color: 'neutral',

@@ -97,7 +97,7 @@ export const AuthModal: React.FC = () => {
             <Scale className="w-6 h-6" />
           </div>
           <h2 className="text-2xl font-extrabold text-slate-900 dark:text-[#FFFFFF] font-display">
-            {mode === 'login' && 'Welcome to NyayaSetu'}
+            {mode === 'login' && 'Welcome to LawSphere'}
             {mode === 'signup' && 'Create Your Account'}
             {mode === 'forgot' && 'Reset Password'}
           </h2>

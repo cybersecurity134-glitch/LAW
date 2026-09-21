@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { 
   Bookmark, 
@@ -16,6 +16,7 @@ import { LawCard } from '../LawCard';
 import { CitizenRightsGuide } from '../legal/CitizenRightsGuide';
 import { LegalMaxims } from '../legal/LegalMaxims';
 import { LegalHelplines } from '../legal/LegalHelplines';
+import { copyToClipboard } from '../../utils/clipboard';
 
 export const SavedView: React.FC = () => {
   const { 
@@ -30,17 +31,22 @@ export const SavedView: React.FC = () => {
   const [savedSearch, setSavedSearch] = useState('');
   const [copiedAll, setCopiedAll] = useState(false);
 
-  const bookmarkedLaws = laws.filter(l => bookmarks.includes(l.id));
+  const bookmarkedLaws = useMemo(() => {
+    return laws.filter(l => bookmarks.includes(l.id));
+  }, [laws, bookmarks]);
 
-  const filteredBookmarks = bookmarkedLaws.filter(l => {
-    const q = savedSearch.toLowerCase();
-    return (
-      l.section_number.toLowerCase().includes(q) ||
-      l.section_title.toLowerCase().includes(q) ||
-      l.act_name.toLowerCase().includes(q) ||
-      l.keywords.some(k => k.toLowerCase().includes(q))
-    );
-  });
+  const filteredBookmarks = useMemo(() => {
+    const q = savedSearch.trim().toLowerCase();
+    if (!q) return bookmarkedLaws;
+    return bookmarkedLaws.filter(l => {
+      return (
+        l.section_number.toLowerCase().includes(q) ||
+        l.section_title.toLowerCase().includes(q) ||
+        l.act_name.toLowerCase().includes(q) ||
+        l.keywords.some(k => k.toLowerCase().includes(q))
+      );
+    });
+  }, [bookmarkedLaws, savedSearch]);
 
   const handleCopyAll = async () => {
     if (bookmarkedLaws.length === 0) return;
@@ -48,8 +54,8 @@ export const SavedView: React.FC = () => {
       `• ${l.act_name} - ${l.section_number}: ${l.section_title}\nPunishment: ${l.punishment} | Fine: ${l.fine}\nSource: ${l.source} (${l.source_url})`
     )).join('\n\n');
 
-    if (navigator.clipboard) {
-      await navigator.clipboard.writeText(text);
+    const success = await copyToClipboard(text);
+    if (success) {
       setCopiedAll(true);
       setTimeout(() => setCopiedAll(false), 2000);
     }
@@ -103,7 +109,7 @@ export const SavedView: React.FC = () => {
           {/* Grid of Saved Laws */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filteredBookmarks.map(law => (
-              <LawCard key={law.id} law={law} />
+              <LawCard key={law.id} law={law} isSaved={true} />
             ))}
           </div>
 
