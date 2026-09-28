@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { motion } from 'motion/react';
 import { 
   Bookmark, 
@@ -12,7 +12,7 @@ import {
   MapPin
 } from 'lucide-react';
 import { LawItem } from '../types';
-import { useApp } from '../context/AppContext';
+import { useLawActions } from '../context/AppContext';
 import { MOTION_EASINGS } from '../utils/motion';
 import { preloadLawDetail } from '../utils/preload';
 import { prefetchLawDetail } from '../api/legalQueries';
@@ -24,33 +24,30 @@ interface LawCardProps {
   className?: string;
 }
 
-const LawCardComponent: React.FC<LawCardProps> = ({ law, compact = false, isSaved, className = '' }) => {
+const LawCardComponent: React.FC<LawCardProps> = ({ law, compact = false, isSaved = false, className = '' }) => {
   const { 
     openLawDetail, 
-    isBookmarked, 
     toggleBookmark, 
-    explanationMode, 
-    setShowAIAssistant,
-    setAiInitialQuestion
-  } = useApp();
+    askAI, 
+    explanationMode 
+  } = useLawActions();
 
-  const saved = isSaved !== undefined ? isSaved : isBookmarked(law.id);
+  const saved = Boolean(isSaved);
 
-  const handleCardInteraction = () => {
+  const handleCardInteraction = useCallback(() => {
     preloadLawDetail();
     prefetchLawDetail(law.id);
-  };
+  }, [law.id]);
 
-  const handleBookmarkClick = (e: React.MouseEvent) => {
+  const handleBookmarkClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     toggleBookmark(law.id);
-  };
+  }, [toggleBookmark, law.id]);
 
-  const handleAskAIClick = (e: React.MouseEvent) => {
+  const handleAskAIClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    setAiInitialQuestion(`Explain ${law.act_name} ${law.section_number} (${law.section_title}) and its penalties.`);
-    setShowAIAssistant(true);
-  };
+    askAI(law);
+  }, [askAI, law]);
 
   return (
     <div
@@ -58,7 +55,7 @@ const LawCardComponent: React.FC<LawCardProps> = ({ law, compact = false, isSave
       onMouseEnter={handleCardInteraction}
       onTouchStart={handleCardInteraction}
       onFocus={handleCardInteraction}
-      className={`group relative liquid-glass-card rounded-2xl p-3.5 sm:p-5 cursor-pointer flex flex-col justify-between hover:shadow-xl hover:border-orange-500/30 dark:hover:border-[#7C5CFF]/40 transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.99] w-full min-w-0 ${className}`}
+      className={`group relative liquid-glass-card law-card-virtual rounded-2xl p-3.5 sm:p-5 cursor-pointer flex flex-col justify-between hover:shadow-xl hover:border-orange-500/30 dark:hover:border-[#7C5CFF]/40 transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.99] w-full min-w-0 ${className}`}
     >
       <div className="min-w-0">
         {/* Top Badges: Act, Section & Actions */}
@@ -196,4 +193,11 @@ const LawCardComponent: React.FC<LawCardProps> = ({ law, compact = false, isSave
   );
 };
 
-export const LawCard = React.memo(LawCardComponent);
+export const LawCard = React.memo(LawCardComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.law.id === nextProps.law.id &&
+    prevProps.isSaved === nextProps.isSaved &&
+    prevProps.compact === nextProps.compact &&
+    prevProps.className === nextProps.className
+  );
+});

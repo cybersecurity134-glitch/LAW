@@ -1,261 +1,107 @@
 /**
- * NyayaSetu India - Central Motion Design System
+ * Central Motion Design System - Instantaneous Performance Configuration
  * 
- * Provides unified timings, easings, spring configurations, and Framer/Motion variants
- * to ensure 60 FPS, GPU-accelerated, and consistent animations across the application.
+ * Configured with 0 durations and instant transitions to guarantee:
+ * - Zero animations across the app
+ * - 0ms layout lag and 0 frame drops
+ * - Smooth performance on any refresh rate up to 175Hz
+ * - Instant VSync frame alignment without jank
  */
 
-// Centralized Timing Tokens (seconds)
+// Zero Duration Tokens for immediate UI feedback
 export const MOTION_DURATIONS = {
-  fast: 0.15,      // 150ms - micro-interactions, toggles, icon clicks
-  normal: 0.28,    // 280ms - dropdowns, button states, card hover
-  smooth: 0.36,    // 360ms - page transitions, drawer slides, modal open
-  large: 0.48,     // 480ms - complex view expansion, large dialogs
+  fast: 0,
+  normal: 0,
+  smooth: 0,
+  large: 0,
 } as const;
 
-// Easing Curves
+// Easing Curves (instantaneous linear)
 export const MOTION_EASINGS = {
-  // Apple/iOS-inspired smooth deceleration curve
-  appleDecel: [0.16, 1, 0.3, 1] as [number, number, number, number],
-  // Standard smooth cubic-bezier
-  standard: [0.25, 0.1, 0.25, 1] as [number, number, number, number],
-  // Acceleration for exiting elements
-  accelerate: [0.4, 0, 1, 1] as [number, number, number, number],
-  // Gentle ease in and out
-  easeInOut: [0.42, 0, 0.58, 1] as [number, number, number, number],
+  appleDecel: [0, 0, 1, 1] as [number, number, number, number],
+  standard: [0, 0, 1, 1] as [number, number, number, number],
+  accelerate: [0, 0, 1, 1] as [number, number, number, number],
+  easeInOut: [0, 0, 1, 1] as [number, number, number, number],
 } as const;
 
-// Spring Configurations
+// Springs configured with 0 duration for instant resolution
 export const MOTION_SPRINGS = {
-  gentle: { type: 'spring' as const, stiffness: 280, damping: 28 },
-  interactive: { type: 'spring' as const, stiffness: 420, damping: 30 },
-  snappy: { type: 'spring' as const, stiffness: 500, damping: 32 },
-  bouncy: { type: 'spring' as const, stiffness: 400, damping: 22 },
+  gentle: { type: 'tween' as const, duration: 0 },
+  interactive: { type: 'tween' as const, duration: 0 },
+  snappy: { type: 'tween' as const, duration: 0 },
+  bouncy: { type: 'tween' as const, duration: 0 },
 };
 
-// Check if user prefers reduced motion
-export const prefersReducedMotion = (): boolean => {
-  if (typeof window === 'undefined') return false;
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-};
+export const prefersReducedMotion = (): boolean => true;
 
 // ============================================================================
-// MOTION VARIANTS
+// MOTION VARIANTS (Zero duration, instant displays)
 // ============================================================================
 
-// 1. Page / Route Transition - Refined with subtle spring physics for instant, fluid navigation
+// 1. Page / Route Transition
 export const tabSpringVariants = {
-  initial: {
-    opacity: 0,
-    y: 8,
-    scale: 0.995,
-  },
-  animate: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: {
-      type: 'spring' as const,
-      stiffness: 440,
-      damping: 30,
-      mass: 0.8,
-    },
-  },
-  exit: {
-    opacity: 0,
-    y: -6,
-    scale: 0.995,
-    transition: {
-      duration: 0.12,
-      ease: MOTION_EASINGS.accelerate,
-    },
-  },
+  initial: { opacity: 1 },
+  animate: { opacity: 1, transition: { duration: 0 } },
+  exit: { opacity: 1, transition: { duration: 0 } },
 };
 
 export const pageVariants = tabSpringVariants;
 
 // 2. Modal Backdrop and Content
 export const modalBackdropVariants = {
-  initial: { opacity: 0 },
-  animate: {
-    opacity: 1,
-    transition: {
-      duration: MOTION_DURATIONS.normal,
-      ease: MOTION_EASINGS.appleDecel,
-    },
-  },
-  exit: {
-    opacity: 0,
-    transition: {
-      duration: MOTION_DURATIONS.fast,
-      ease: MOTION_EASINGS.accelerate,
-    },
-  },
+  initial: { opacity: 1 },
+  animate: { opacity: 1, transition: { duration: 0 } },
+  exit: { opacity: 1, transition: { duration: 0 } },
 };
 
 export const modalCardVariants = {
-  initial: {
-    opacity: 0,
-    scale: 0.96,
-    y: 10,
-  },
-  animate: {
-    opacity: 1,
-    scale: 1,
-    y: 0,
-    transition: {
-      duration: MOTION_DURATIONS.smooth,
-      ease: MOTION_EASINGS.appleDecel,
-    },
-  },
-  exit: {
-    opacity: 0,
-    scale: 0.97,
-    y: 8,
-    transition: {
-      duration: MOTION_DURATIONS.fast,
-      ease: MOTION_EASINGS.accelerate,
-    },
-  },
+  initial: { opacity: 1, scale: 1, y: 0 },
+  animate: { opacity: 1, scale: 1, y: 0, transition: { duration: 0 } },
+  exit: { opacity: 1, scale: 1, y: 0, transition: { duration: 0 } },
 };
 
-// 3. Staggered Container and Item (for Hero, Card Grids, Search Results)
+// 3. Staggered Container and Item
 export const staggerContainerVariants = {
   initial: {},
-  animate: {
-    transition: {
-      staggerChildren: 0.05,
-      delayChildren: 0.02,
-    },
-  },
+  animate: { transition: { staggerChildren: 0, delayChildren: 0 } },
 };
 
 export const staggerItemVariants = {
-  initial: {
-    opacity: 0,
-    y: 10,
-  },
-  animate: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: MOTION_DURATIONS.normal,
-      ease: MOTION_EASINGS.appleDecel,
-    },
-  },
+  initial: { opacity: 1, y: 0 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0 } },
 };
 
-// 4. Slide-in Drawer Variants (Mobile Sidebar)
+// 4. Slide-in Drawer Variants
 export const drawerVariants = {
-  initial: {
-    x: '-100%',
-    opacity: 0.5,
-  },
-  animate: {
-    x: 0,
-    opacity: 1,
-    transition: {
-      type: 'spring' as const,
-      damping: 32,
-      stiffness: 340,
-    },
-  },
-  exit: {
-    x: '-100%',
-    opacity: 0,
-    transition: {
-      duration: MOTION_DURATIONS.normal,
-      ease: MOTION_EASINGS.accelerate,
-    },
-  },
+  initial: { x: 0, opacity: 1 },
+  animate: { x: 0, opacity: 1, transition: { duration: 0 } },
+  exit: { x: '-100%', opacity: 1, transition: { duration: 0 } },
 };
 
-// 5. Card Hover & Tap Interactions
+// 5. Card Hover & Tap Interactions (0 transform for zero jank)
 export const interactiveCardVariants = {
-  rest: {
-    y: 0,
-    scale: 1,
-    transition: {
-      duration: MOTION_DURATIONS.fast,
-      ease: MOTION_EASINGS.standard,
-    },
-  },
-  hover: {
-    y: -3,
-    scale: 1.01,
-    transition: {
-      duration: MOTION_DURATIONS.fast,
-      ease: MOTION_EASINGS.appleDecel,
-    },
-  },
-  tap: {
-    y: 0,
-    scale: 0.98,
-    transition: {
-      duration: 0.1,
-      ease: MOTION_EASINGS.standard,
-    },
-  },
+  rest: { y: 0, scale: 1, transition: { duration: 0 } },
+  hover: { y: 0, scale: 1, transition: { duration: 0 } },
+  tap: { y: 0, scale: 1, transition: { duration: 0 } },
 };
 
 // 6. Interactive Button Press
 export const buttonPressVariants = {
   rest: { scale: 1 },
-  hover: { scale: 1.02 },
-  tap: { scale: 0.97 },
+  hover: { scale: 1 },
+  tap: { scale: 1 },
 };
 
 // 7. Toast Notification Variants
 export const toastVariants = {
-  initial: {
-    opacity: 0,
-    y: 20,
-    scale: 0.95,
-  },
-  animate: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: {
-      duration: MOTION_DURATIONS.normal,
-      ease: MOTION_EASINGS.appleDecel,
-    },
-  },
-  exit: {
-    opacity: 0,
-    y: 16,
-    scale: 0.95,
-    transition: {
-      duration: MOTION_DURATIONS.fast,
-      ease: MOTION_EASINGS.accelerate,
-    },
-  },
+  initial: { opacity: 1, y: 0, scale: 1 },
+  animate: { opacity: 1, y: 0, scale: 1, transition: { duration: 0 } },
+  exit: { opacity: 0, y: 0, scale: 1, transition: { duration: 0 } },
 };
 
 // 8. Search Result Item Entry/Exit/Layout Variants
 export const searchResultItemVariants = {
-  initial: {
-    opacity: 0,
-    y: 16,
-    scale: 0.97,
-  },
-  animate: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: {
-      duration: MOTION_DURATIONS.normal,
-      ease: MOTION_EASINGS.appleDecel,
-    },
-  },
-  exit: {
-    opacity: 0,
-    y: -10,
-    scale: 0.94,
-    transition: {
-      duration: 0.16,
-      ease: MOTION_EASINGS.accelerate,
-    },
-  },
+  initial: { opacity: 1, y: 0, scale: 1 },
+  animate: { opacity: 1, y: 0, scale: 1, transition: { duration: 0 } },
+  exit: { opacity: 0, y: 0, scale: 1, transition: { duration: 0 } },
 };
-

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { 
   Layers, 
@@ -39,6 +39,20 @@ export const CategoriesView: React.FC = () => {
     return categories.find(c => c.id === selectedCategory);
   }, [categories, selectedCategory]);
 
+  // Pre-index laws by category_id once - eliminates O(Categories * Laws) filtering churn
+  const lawsByCategory = useMemo(() => {
+    const map = new Map<string, typeof laws>();
+    for (const law of laws) {
+      const existing = map.get(law.category_id);
+      if (existing) {
+        existing.push(law);
+      } else {
+        map.set(law.category_id, [law]);
+      }
+    }
+    return map;
+  }, [laws]);
+
   // Helper to check if a law matches the search requirement
   const checkLawMatchesReq = (law: any, query: string): boolean => {
     if (!query) return true;
@@ -55,12 +69,12 @@ export const CategoriesView: React.FC = () => {
     );
   };
 
-  // Map category to matching laws count based on requirement
+  // Map category to matching laws count based on requirement (O(1) category access)
   const categoryMatchStats = useMemo(() => {
     const q = categorySearch.trim();
     const stats: Record<string, { count: number; totalInCat: number }> = {};
     categories.forEach(cat => {
-      const lawsInCat = laws.filter(l => l.category_id === cat.id);
+      const lawsInCat = lawsByCategory.get(cat.id) || [];
       const matching = q ? lawsInCat.filter(l => checkLawMatchesReq(l, q)) : lawsInCat;
       stats[cat.id] = {
         count: matching.length,
@@ -68,7 +82,7 @@ export const CategoriesView: React.FC = () => {
       };
     });
     return stats;
-  }, [categories, laws, categorySearch]);
+  }, [categories, lawsByCategory, categorySearch]);
 
   const filteredCategories = useMemo(() => {
     const q = categorySearch.trim().toLowerCase();
@@ -88,18 +102,42 @@ export const CategoriesView: React.FC = () => {
     });
   }, [categories, categorySearch, categoryMatchStats, showZeroMatches]);
 
+  const [visibleCount, setVisibleCount] = useState(16);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // Reset pagination when category or search changes
+  useEffect(() => {
+    setVisibleCount(16);
+  }, [selectedCategory, categorySearch]);
+
   const categoryLaws = useMemo(() => {
     if (!selectedCategory) return [];
     const q = categorySearch.trim();
-    const baseLaws = laws.filter(l => l.category_id === selectedCategory);
+    const baseLaws = lawsByCategory.get(selectedCategory) || [];
     if (!q) return baseLaws;
     return baseLaws.filter(l => checkLawMatchesReq(l, q));
-  }, [laws, selectedCategory, categorySearch]);
+  }, [lawsByCategory, selectedCategory, categorySearch]);
+
+  const displayedCategoryLaws = useMemo(() => {
+    return categoryLaws.slice(0, visibleCount);
+  }, [categoryLaws, visibleCount]);
+
+  // Infinite scroll sentinel for 175Hz butter-smooth scrolling
+  useEffect(() => {
+    if (!sentinelRef.current || visibleCount >= categoryLaws.length) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        setVisibleCount(prev => prev + 16);
+      }
+    }, { rootMargin: '300px' });
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [visibleCount, categoryLaws.length]);
 
   const totalLawsInSelectedCat = useMemo(() => {
     if (!selectedCategory) return 0;
-    return laws.filter(l => l.category_id === selectedCategory).length;
-  }, [laws, selectedCategory]);
+    return (lawsByCategory.get(selectedCategory) || []).length;
+  }, [lawsByCategory, selectedCategory]);
 
   return (
     <div className="space-y-6 pb-12 view-blur-open">
@@ -205,10 +243,25 @@ export const CategoriesView: React.FC = () => {
             </div>
 
             {categoryLaws.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {categoryLaws.map(law => (
-                  <LawCard key={law.id} law={law} isSaved={bookmarkSet.has(law.id)} />
-                ))}
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {displayedCategoryLaws.map(law => (
+                    <div key={law.id} className="law-card-virtual">
+                      <LawCard law={law} isSaved={bookmarkSet.has(law.id)} />
+                    </div>
+                  ))}
+                </div>
+
+                {visibleCount < categoryLaws.length && (
+                  <div ref={sentinelRef} className="pt-2 text-center">
+                    <button
+                      onClick={() => setVisibleCount(prev => prev + 16)}
+                      className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#181818] dark:hover:bg-[#202020] text-xs font-semibold text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                    >
+                      Load More Laws ({categoryLaws.length - visibleCount} remaining)
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="p-8 text-center rounded-3xl liquid-glass-card space-y-3 dark:border-[#292929] border border-slate-200">

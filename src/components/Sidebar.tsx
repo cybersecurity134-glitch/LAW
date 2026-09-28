@@ -22,7 +22,7 @@ import { drawerVariants, modalBackdropVariants } from '../utils/motion';
 import { preloadTab } from '../utils/preload';
 
 interface SidebarNavItem {
-  id: 'home' | 'search' | 'categories' | 'saved' | 'profile';
+  id: 'home' | 'search' | 'categories' | 'saved' | 'profile' | 'startup';
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   badge?: number;
@@ -131,6 +131,23 @@ const NAV_THEMES: Record<string, NavTheme> = {
     hoverBorder: 'hover:border-emerald-500/30',
     hoverText: 'hover:text-emerald-700 dark:hover:text-emerald-300',
     accentBar: 'bg-gradient-to-b from-emerald-400 via-teal-500 to-cyan-600 shadow-[0_0_12px_rgba(16,185,129,0.9)]'
+  },
+  startup: {
+    activeBg: 'bg-gradient-to-r from-indigo-500/25 via-purple-500/18 to-pink-500/5 dark:from-indigo-500/30 dark:via-purple-500/22 dark:to-transparent',
+    activeBorder: 'border-indigo-500/60 dark:border-indigo-400/60',
+    activeText: 'text-indigo-800 dark:text-indigo-300 font-bold',
+    activeGlow: 'shadow-[0_0_24px_-2px_rgba(99,102,241,0.35)] dark:shadow-[0_0_28px_-2px_rgba(99,102,241,0.45)]',
+    activeIconColor: 'text-indigo-600 dark:text-indigo-400',
+    inactiveIconColor: 'text-indigo-500/70 group-hover:text-indigo-500',
+    badgeBg: 'bg-indigo-500/25 dark:bg-indigo-500/35',
+    badgeText: 'text-indigo-800 dark:text-indigo-300',
+    badgeBorder: 'border-indigo-500/40',
+    indicatorBg: 'bg-indigo-500',
+    pingBg: 'bg-indigo-400',
+    hoverBg: 'hover:bg-indigo-500/10 dark:hover:bg-indigo-500/15',
+    hoverBorder: 'hover:border-indigo-500/30',
+    hoverText: 'hover:text-indigo-700 dark:hover:text-indigo-300',
+    accentBar: 'bg-gradient-to-b from-indigo-400 via-purple-500 to-pink-600 shadow-[0_0_12px_rgba(99,102,241,0.9)]'
   }
 };
 
@@ -258,6 +275,7 @@ export const Sidebar: React.FC = () => {
 
   const mainNav: SidebarNavItem[] = [
     { id: 'home', label: 'Home Dashboard', icon: Home },
+    { id: 'startup', label: 'Startup News & Network', icon: Sparkles },
     { id: 'search', label: 'Search Laws & Sections', icon: Search },
     { id: 'categories', label: `Categories (${CATEGORIES.length})`, icon: Layers },
     { id: 'saved', label: 'Saved Laws', icon: Bookmark, badge: bookmarks.length },
@@ -628,7 +646,7 @@ export const Sidebar: React.FC = () => {
       {/* Desktop View (lg+): Static column layout */}
       <aside 
         id="sidebar-nav-desktop"
-        className="hidden lg:flex flex-col select-none border-r border-slate-200/90 dark:border-[#292929] bg-white dark:bg-[#0B0B0B] text-slate-800 dark:text-[#FFFFFF] p-5 space-y-6 shrink-0 lg:w-64 lg:w-72 lg:min-h-[calc(100vh-4rem)] shadow-[inset_0_1.5px_1.5px_rgba(255,255,255,1),0_4px_20px_-4px_rgba(0,0,0,0.03)] dark:shadow-none"
+        className="hidden lg:flex flex-col select-none border-r border-slate-200/90 dark:border-[#292929] bg-white dark:bg-[#0B0B0B] text-slate-800 dark:text-[#FFFFFF] p-5 space-y-6 shrink-0 lg:w-64 lg:w-72 lg:min-h-[calc(100dvh-4rem)] shadow-[inset_0_1.5px_1.5px_rgba(255,255,255,1),0_4px_20px_-4px_rgba(0,0,0,0.03)] dark:shadow-none"
       >
         {renderNavContent(false)}
       </aside>

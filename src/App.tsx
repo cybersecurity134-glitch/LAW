@@ -27,6 +27,10 @@ const OnboardingModal = lazy(() => import('./components/OnboardingModal').then(m
 const LawBookIngestionModal = lazy(() => import('./components/LawBookIngestionModal').then(m => ({ default: m.LawBookIngestionModal })));
 const AdminOverrideModal = lazy(() => import('./components/AdminOverrideModal').then(m => ({ default: m.AdminOverrideModal })));
 const CinematicOpening = lazy(() => import('./components/cinematic/CinematicOpening').then(m => ({ default: m.CinematicOpening })));
+const StartupNewsFeed = lazy(() => import('./components/startup/StartupNewsFeed').then(m => ({ default: m.StartupNewsFeed })));
+const NewsSubmissionModal = lazy(() => import('./components/startup/NewsSubmissionModal').then(m => ({ default: m.NewsSubmissionModal })));
+const NetworkingChatModal = lazy(() => import('./components/startup/NetworkingChatModal').then(m => ({ default: m.NetworkingChatModal })));
+const AdminEditorialModal = lazy(() => import('./components/startup/AdminEditorialModal').then(m => ({ default: m.AdminEditorialModal })));
 
 const AppContent: React.FC = () => {
   const { 
@@ -38,7 +42,17 @@ const AppContent: React.FC = () => {
     showIngestionModal,
     showAdminModal,
     showCinematicIntro,
-    setShowCinematicIntro
+    setShowCinematicIntro,
+    appUser,
+    showStartupSubmitModal,
+    setShowStartupSubmitModal,
+    showStartupChatModal,
+    setShowStartupChatModal,
+    showStartupAdminModal,
+    setShowStartupAdminModal,
+    chatTargetAuthor,
+    openChatWithAuthor,
+    setShowAuthModal
   } = useApp();
 
   const { isTablet, isTabletLandscape } = useBreakpoint();
@@ -80,13 +94,13 @@ const AppContent: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#050505] text-slate-900 dark:text-[#FFFFFF] flex flex-col font-sans transition-colors duration-300 selection:bg-orange-500/30 dark:selection:bg-[#7C5CFF]/30 selection:text-orange-900 dark:selection:text-white overflow-x-hidden relative">
+    <div className="h-[100dvh] max-h-[100dvh] bg-white dark:bg-[#050505] text-slate-900 dark:text-[#FFFFFF] flex flex-col font-sans selection:bg-orange-500/30 dark:selection:bg-[#7C5CFF]/30 selection:text-orange-900 dark:selection:text-white overflow-hidden relative overscroll-none">
       
       {/* Law-Themed Jurisprudential Liquid Glass Background */}
       <LawBackground />
 
       {/* Main Page Layout Layer (Hardware-accelerated depth field) */}
-      <div className={`flex-1 flex flex-col w-full transition-all duration-300 ${isModalOpen ? 'app-modal-blur-active' : 'app-modal-blur-inactive'}`}>
+      <div className={`flex-1 flex flex-col w-full min-h-0 overflow-hidden ${isModalOpen ? 'app-modal-blur-active' : 'app-modal-blur-inactive'}`}>
         {/* Top Navbar */}
         <Navbar />
 
@@ -95,10 +109,10 @@ const AppContent: React.FC = () => {
 
         {/* Main Layout Body: Adaptive Tablet 2/3-Column vs Standard Screen */}
         {isTablet ? (
-          <div className="flex-1 w-full mx-auto flex flex-col z-10 relative">
+          <div className="flex-1 w-full mx-auto flex flex-col z-10 relative min-h-0 overflow-hidden pb-[calc(4rem+env(safe-area-inset-bottom,0px))]">
             <Suspense fallback={<div className="p-8 max-w-4xl mx-auto w-full"><ViewSkeleton type="search" /></div>}>
               {activeTab === 'profile' ? (
-                <main className="flex-1 p-6 lg:p-8 min-w-0 max-w-4xl mx-auto w-full pb-8">
+                <main className="flex-1 p-6 lg:p-8 min-w-0 max-w-4xl mx-auto w-full overflow-y-auto pb-8">
                   <ProfileView />
                 </main>
               ) : (
@@ -107,12 +121,12 @@ const AppContent: React.FC = () => {
             </Suspense>
           </div>
         ) : (
-          <div className="flex-1 max-w-7xl w-full mx-auto flex z-10 relative">
+          <div className="flex-1 max-w-7xl w-full mx-auto flex z-10 relative min-h-0 overflow-hidden pb-[calc(4rem+env(safe-area-inset-bottom,0px))] xl:pb-0">
             {/* Left Sidebar (Desktop & Mobile Drawer) */}
             <Sidebar />
 
             {/* Main View Screen Container with Fluid Spring Tab Transitions */}
-            <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 max-w-full pb-24 md:pb-8">
+            <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0 max-w-full overflow-y-auto pb-8">
               <AnimatePresence mode="wait" initial={false}>
                 <motion.div
                   key={activeTab}
@@ -128,6 +142,14 @@ const AppContent: React.FC = () => {
                     {activeTab === 'categories' && <CategoriesView />}
                     {activeTab === 'saved' && <SavedView />}
                     {activeTab === 'profile' && <ProfileView />}
+                    {activeTab === 'startup' && (
+                      <StartupNewsFeed
+                        currentUser={appUser}
+                        onOpenSubmitModal={() => setShowStartupSubmitModal(true)}
+                        onOpenChatWithAuthor={openChatWithAuthor}
+                        onOpenAdminModal={() => setShowStartupAdminModal(true)}
+                      />
+                    )}
                   </Suspense>
                 </motion.div>
               </AnimatePresence>
@@ -176,16 +198,35 @@ const AppContent: React.FC = () => {
         </Suspense>
       )}
 
+      {/* Startup News & Networking App Modals */}
+      <Suspense fallback={null}>
+        <NewsSubmissionModal
+          isOpen={showStartupSubmitModal}
+          onClose={() => setShowStartupSubmitModal(false)}
+          currentUser={appUser}
+          onRequireAuth={() => setShowAuthModal(true)}
+        />
+        <NetworkingChatModal
+          isOpen={showStartupChatModal}
+          onClose={() => setShowStartupChatModal(false)}
+          currentUser={appUser}
+          targetAuthor={chatTargetAuthor}
+        />
+        <AdminEditorialModal
+          isOpen={showStartupAdminModal}
+          onClose={() => setShowStartupAdminModal(false)}
+          currentUser={appUser}
+        />
+      </Suspense>
+
       <RefreshStatusToast />
 
       {/* Cinematic Opening Animation */}
-      <AnimatePresence>
-        {showCinematicIntro && (
-          <Suspense fallback={null}>
-            <CinematicOpening onComplete={() => setShowCinematicIntro(false)} />
-          </Suspense>
-        )}
-      </AnimatePresence>
+      {showCinematicIntro && (
+        <Suspense fallback={null}>
+          <CinematicOpening onComplete={() => setShowCinematicIntro(false)} />
+        </Suspense>
+      )}
     </div>
   );
 };

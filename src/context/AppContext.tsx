@@ -13,13 +13,19 @@ import {
 import { LAWS_DATABASE, UPDATE_HISTORY } from '../data/laws';
 import { CATEGORIES } from '../data/categories';
 import { invalidateAllLegalQueries, prefetchLawDetail } from '../api/legalQueries';
+import { authService, AppUser } from '../services/authService';
+import { testConnection } from '../services/firebase';
 
 interface AppContextType {
   // User & Auth
   user: UserProfile | null;
+  appUser: AppUser | null;
   isAuthenticated: boolean;
   login: (email: string, name?: string) => void;
   signUp: (email: string, name: string, password?: string) => void;
+  loginWithEmail: (email: string, pass: string) => Promise<void>;
+  signUpWithEmail: (email: string, pass: string, name: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   continueAsGuest: () => void;
   logout: () => void;
   updatePreferences: (prefs: Partial<UserPreferences>) => void;
@@ -28,6 +34,16 @@ interface AppContextType {
   setShowAuthModal: (show: boolean) => void;
   showOnboardingModal: boolean;
   setShowOnboardingModal: (show: boolean) => void;
+
+  // Startup News & Networking State
+  showStartupSubmitModal: boolean;
+  setShowStartupSubmitModal: (show: boolean) => void;
+  showStartupChatModal: boolean;
+  setShowStartupChatModal: (show: boolean) => void;
+  showStartupAdminModal: boolean;
+  setShowStartupAdminModal: (show: boolean) => void;
+  chatTargetAuthor: { authorId: string; authorName: string } | null;
+  openChatWithAuthor: (authorId: string, authorName: string) => void;
 
   // Laws Database & Views
   laws: LawItem[];
@@ -59,8 +75,8 @@ interface AppContextType {
   setExplanationMode: (mode: 'simple' | 'detailed') => void;
 
   // Navigation
-  activeTab: 'home' | 'search' | 'categories' | 'saved' | 'ai' | 'profile';
-  setActiveTab: (tab: 'home' | 'search' | 'categories' | 'saved' | 'ai' | 'profile') => void;
+  activeTab: 'home' | 'search' | 'categories' | 'saved' | 'ai' | 'profile' | 'startup';
+  setActiveTab: (tab: 'home' | 'search' | 'categories' | 'saved' | 'ai' | 'profile' | 'startup') => void;
   selectedCategory: string | null;
   setSelectedCategory: (catId: string | null) => void;
   isMobileSidebarOpen: boolean;
@@ -72,6 +88,7 @@ interface AppContextType {
   setShowAIAssistant: (show: boolean) => void;
   aiInitialQuestion: string;
   setAiInitialQuestion: (q: string) => void;
+  askAI: (law: LawItem) => void;
 
   // Law Book Data Ingestion Modal
   showIngestionModal: boolean;
@@ -121,6 +138,25 @@ const GUEST_PROFILE: UserProfile = {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+// Dedicated actions-only sub-context to allow LawCards and list items
+// to execute actions without re-rendering when unrelated global filters/state change.
+export interface LawActionsContextType {
+  openLawDetail: (lawId: string) => void;
+  toggleBookmark: (lawId: string) => void;
+  askAI: (law: LawItem) => void;
+  explanationMode: 'simple' | 'detailed';
+}
+
+export const LawActionsContext = createContext<LawActionsContextType | undefined>(undefined);
+
+export const useLawActions = (): LawActionsContextType => {
+  const context = useContext(LawActionsContext);
+  if (!context) {
+    throw new Error('useLawActions must be used within an AppProvider');
+  }
+  return context;
+};
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // User Profile
   const [user, setUser] = useState<UserProfile | null>(() => {
@@ -131,15 +167,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return null;
   });
 
+  const [appUser, setAppUser] = useState<AppUser | null>(null);
+
+  // Startup News & Networking States
+  const [showStartupSubmitModal, setShowStartupSubmitModal] = useState<boolean>(false);
+  const [showStartupChatModal, setShowStartupChatModal] = useState<boolean>(false);
+  const [showStartupAdminModal, setShowStartupAdminModal] = useState<boolean>(false);
+  const [chatTargetAuthor, setChatTargetAuthor] = useState<{ authorId: string; authorName: string } | null>(null);
+
+  const openChatWithAuthor = useCallback((authorId: string, authorName: string) => {
+    setChatTargetAuthor({ authorId, authorName });
+    setShowStartupChatModal(true);
+  }, []);
+
+  // Firebase Auth State Subscription & Offline Connection Boot Check
+  useEffect(() => {
+    testConnection().catch(() => {});
+
+    const unsubscribe = authService.subscribeToAuthState((userData) => {
+      setAppUser(userData);
+      if (userData) {
+        setUser({
+          id: userData.uid,
+          name: userData.displayName || 'Startup Member',
+          email: userData.email || '',
+          preferences: DEFAULT_PREFERENCES,
+          onboarding_completed: true,
+        });
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [showOnboardingModal, setShowOnboardingModal] = useState<boolean>(false);
-  const [showCinematicIntro, setShowCinematicIntro] = useState<boolean>(() => {
-    try {
-      return !sessionStorage.getItem('lawsphere_intro_seen');
-    } catch {
-      return false;
-    }
-  });
+  const [showCinematicIntro, setShowCinematicIntro] = useState<boolean>(false);
 
   const handleSetShowCinematicIntro = useCallback((show: boolean) => {
     setShowCinematicIntro(show);
@@ -181,7 +246,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   // Search & Navigation
-  const [activeTab, setActiveTab] = useState<'home' | 'search' | 'categories' | 'saved' | 'ai' | 'profile'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'search' | 'categories' | 'saved' | 'ai' | 'profile' | 'startup'>('home');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
 
@@ -421,11 +486,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setShowAuthModal(false);
   }, []);
 
-  const logout = useCallback(() => {
+  const loginWithEmail = useCallback(async (email: string, pass: string) => {
+    const result = await authService.signInWithEmail(email, pass);
+    setAppUser(result);
+    setShowAuthModal(false);
+  }, []);
+
+  const signUpWithEmail = useCallback(async (email: string, pass: string, name: string) => {
+    const result = await authService.signUpWithEmail(email, pass, name);
+    setAppUser(result);
+    setShowAuthModal(false);
+  }, []);
+
+  const signInWithGoogle = useCallback(async () => {
+    const result = await authService.signInWithGoogle();
+    setAppUser(result);
+    setShowAuthModal(false);
+  }, []);
+
+  const logout = useCallback(async () => {
     try {
+      await authService.signOut();
       localStorage.removeItem('nyaya_user');
     } catch {}
     setUser(null);
+    setAppUser(null);
     setShowAuthModal(true);
   }, []);
 
@@ -624,7 +709,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   }, []);
 
-  const isBookmarked = useCallback((lawId: string) => bookmarks.includes(lawId), [bookmarks]);
+  const bookmarkSet = useMemo(() => new Set(bookmarks), [bookmarks]);
+  const isBookmarked = useCallback((lawId: string) => bookmarkSet.has(lawId), [bookmarkSet]);
+
+  // Ask AI shortcut with stable callback
+  const askAI = useCallback((law: LawItem) => {
+    setAiInitialQuestion(`Explain ${law.act_name} ${law.section_number} (${law.section_title}) and its penalties.`);
+    setShowAIAssistant(true);
+  }, []);
 
   // Live Data Synchronization loader
   const loadSyncData = useCallback(async () => {
@@ -660,17 +752,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     loadSyncData();
   }, [loadSyncData]);
 
-  // Live Refresh handler (forces sync with Gazette and updates all live sections)
+  // Live Refresh handler with optimistic UI updates (forces sync with Gazette and updates all live sections)
   const refreshLegalData = useCallback(async () => {
     setIsRefreshing(true);
+    // Optimistic UI update: immediately show synchronization in progress
+    const optimisticTime = 'Synchronizing with Gazette...';
+    setLastUpdatedTime(optimisticTime);
+
     try {
       const response = await fetch('/api/refresh', { method: 'POST' });
       const data = await response.json();
       if (data.success) {
         setLastUpdatedTime(data.last_updated);
-        await loadSyncData();
+        // Parallelize background refreshes to eliminate waterfall latency
+        await Promise.allSettled([
+          loadSyncData(),
+          syncLaws()
+        ]);
         invalidateAllLegalQueries();
-        await syncLaws();
         const fallbackNote = data.status === 'fallback' ? ' (using verified cached snapshot)' : '';
         setRefreshToast({
           message: `Database synchronized with India Code & Official Gazette${fallbackNote}. Last updated: ${data.last_updated}`,
@@ -694,11 +793,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const dismissRefreshToast = useCallback(() => setRefreshToast(null), []);
 
+  // Isolated LawActions memoized value - only updates when explanationMode changes
+  const lawActionsValue = useMemo<LawActionsContextType>(() => ({
+    openLawDetail,
+    toggleBookmark,
+    askAI,
+    explanationMode
+  }), [openLawDetail, toggleBookmark, askAI, explanationMode]);
+
   const contextValue = useMemo(() => ({
     user,
+    appUser,
     isAuthenticated: !!user && !user.is_guest,
     login,
     signUp,
+    loginWithEmail,
+    signUpWithEmail,
+    signInWithGoogle,
     continueAsGuest,
     logout,
     updatePreferences,
@@ -707,6 +818,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setShowAuthModal,
     showOnboardingModal,
     setShowOnboardingModal,
+    showStartupSubmitModal,
+    setShowStartupSubmitModal,
+    showStartupChatModal,
+    setShowStartupChatModal,
+    showStartupAdminModal,
+    setShowStartupAdminModal,
+    chatTargetAuthor,
+    openChatWithAuthor,
     laws,
     selectedLaw,
     setSelectedLaw,
@@ -739,6 +858,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setShowAIAssistant,
     aiInitialQuestion,
     setAiInitialQuestion,
+    askAI,
     showIngestionModal,
     setShowIngestionModal,
     lastUpdatedTime,
@@ -759,14 +879,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     replayCinematicIntro
   }), [
     user,
+    appUser,
     login,
     signUp,
+    loginWithEmail,
+    signUpWithEmail,
+    signInWithGoogle,
     continueAsGuest,
     logout,
     updatePreferences,
     completeOnboarding,
     showAuthModal,
     showOnboardingModal,
+    showStartupSubmitModal,
+    showStartupChatModal,
+    showStartupAdminModal,
+    chatTargetAuthor,
+    openChatWithAuthor,
     laws,
     selectedLaw,
     openLawDetail,
@@ -812,7 +941,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   return (
     <AppContext.Provider value={contextValue}>
-      {children}
+      <LawActionsContext.Provider value={lawActionsValue}>
+        {children}
+      </LawActionsContext.Provider>
     </AppContext.Provider>
   );
 };

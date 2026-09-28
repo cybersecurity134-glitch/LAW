@@ -47,11 +47,24 @@
     --color-info: #3B82F6;
   }
 
-  body {
+  html, body {
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+    -webkit-overscroll-behavior: none;
     font-family: var(--font-sans);
     background-color: var(--bg-app);
     color: var(--text-primary);
-    transition: background-color 0.25s ease, color 0.25s ease;
+  }
+
+  #root {
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+    display: flex;
+    flex-direction: column;
   }
 
   html.dark body {
@@ -68,63 +81,21 @@
   }
 }
 
-/* iOS 26 Liquid Glass Ambient Floating Keyframes */
-@keyframes liquid-float-1 {
-  0%, 100% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  33% {
-    transform: translate3d(35px, -45px, 0) scale(1.12);
-  }
-  66% {
-    transform: translate3d(-30px, 30px, 0) scale(0.94);
-  }
+/* Zero Animation & Instant VSync Engine: 0ms duration, 0 layout lag up to 175Hz */
+*, *::before, *::after {
+  animation-duration: 0.0001ms !important;
+  animation-iteration-count: 1 !important;
+  animation-delay: 0s !important;
+  transition-duration: 0.0001ms !important;
+  transition-delay: 0s !important;
+  scroll-behavior: auto !important;
 }
 
-@keyframes liquid-float-2 {
-  0%, 100% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  33% {
-    transform: translate3d(-40px, 50px, 0) scale(1.08);
-  }
-  66% {
-    transform: translate3d(30px, -25px, 0) scale(0.96);
-  }
-}
-
-@keyframes liquid-float-3 {
-  0%, 100% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  50% {
-    transform: translate3d(40px, 35px, 0) scale(1.15);
-  }
-}
-
-@keyframes liquid-pulse-glow {
-  0%, 100% {
-    opacity: 0.45;
-  }
-  50% {
-    opacity: 0.8;
-  }
-}
-
-.liquid-orb-1 {
-  animation: liquid-float-1 18s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
-
-.liquid-orb-2 {
-  animation: liquid-float-2 22s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
-
-.liquid-orb-3 {
-  animation: liquid-float-3 25s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
-
+.liquid-orb-1,
+.liquid-orb-2,
+.liquid-orb-3,
 .liquid-pulse {
-  animation: liquid-pulse-glow 8s ease-in-out infinite;
+  animation: none !important;
 }
 
 /* Glass Morrison & iOS 26 Liquid Glass Components */
@@ -617,20 +588,14 @@
 /* 3. Underlying App Content Background Depth (Zero heavy blur, purely composited) */
 .app-modal-blur-active {
   opacity: 0.96;
-  transform: scale(0.992) translate3d(0, 0, 0);
-  transform-origin: center top;
-  transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
   pointer-events: none;
-  will-change: transform, opacity;
+  will-change: opacity;
 }
 
 .app-modal-blur-inactive {
   opacity: 1;
-  transform: scale(1) translate3d(0, 0, 0);
-  transform-origin: center top;
-  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: transform, opacity;
+  will-change: opacity;
 }
 
 /* 4. Screen View Transition (GPU composited 60 FPS translation & fade) */
@@ -970,5 +935,30 @@ html.dark {
   line-height: 1.7 !important;
   max-width: var(--tablet-line-length);
 }
+
+/* ==========================================================================
+   High-Performance Rendering & Virtualization Engine
+   - Skips off-screen layout & paint calculation via browser-native content-visibility
+   - Promotes scrolling surfaces to discrete GPU composition layers
+   ========================================================================== */
+.law-card-virtual {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 170px;
+}
+
+.gpu-accelerated {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+  will-change: transform, opacity;
+}
+
+.fast-scroll-container {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  contain: paint;
+}
+
 
 

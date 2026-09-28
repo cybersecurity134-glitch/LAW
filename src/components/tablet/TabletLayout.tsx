@@ -109,6 +109,30 @@ export const TabletLayout: React.FC<TabletLayoutProps> = ({ isTabletLandscape })
     });
   }, [laws, showSavedOnly, bookmarks, searchQuery, selectedCatId, bailFilter, cognizableFilter, stateFilter]);
 
+  const [visibleTabletCount, setVisibleTabletCount] = useState(24);
+  const tabletSentinelRef = useRef<HTMLDivElement>(null);
+
+  // Reset pagination on filter change
+  useEffect(() => {
+    setVisibleTabletCount(24);
+  }, [searchQuery, selectedCatId, bailFilter, cognizableFilter, stateFilter, showSavedOnly]);
+
+  const displayedFilteredLaws = useMemo(() => {
+    return filteredLaws.slice(0, visibleTabletCount);
+  }, [filteredLaws, visibleTabletCount]);
+
+  // Infinite scroll observer for tablet list
+  useEffect(() => {
+    if (!tabletSentinelRef.current || visibleTabletCount >= filteredLaws.length) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        setVisibleTabletCount(prev => prev + 24);
+      }
+    }, { rootMargin: '300px' });
+    observer.observe(tabletSentinelRef.current);
+    return () => observer.disconnect();
+  }, [visibleTabletCount, filteredLaws.length]);
+
   // Always maintain an active law selection when laws exist
   useEffect(() => {
     if (filteredLaws.length > 0) {
@@ -118,10 +142,10 @@ export const TabletLayout: React.FC<TabletLayoutProps> = ({ isTabletLandscape })
     }
   }, [filteredLaws, selectedLaw, setSelectedLaw]);
 
-  // Smoothly scroll detail pane to top whenever active law changes
+  // Instantly scroll detail pane to top whenever active law changes (zero animation delay)
   useEffect(() => {
     if (detailContainerRef.current) {
-      detailContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      detailContainerRef.current.scrollTo({ top: 0, behavior: 'auto' });
     }
   }, [selectedLaw?.id]);
 
@@ -305,7 +329,7 @@ export const TabletLayout: React.FC<TabletLayoutProps> = ({ isTabletLandscape })
   );
 
   return (
-    <div className="w-full flex-1 flex flex-col min-h-0 h-[calc(100vh-4rem)] overflow-hidden bg-slate-100/70 dark:bg-[#070707]">
+    <div className="w-full flex-1 flex flex-col min-h-0 h-full overflow-hidden bg-slate-100/70 dark:bg-[#070707]">
       
       {/* Main Balanced Split-View Container */}
       <div className="flex-1 flex min-h-0 w-full overflow-hidden divide-x divide-slate-200/80 dark:divide-[#222222]">
@@ -502,8 +526,7 @@ export const TabletLayout: React.FC<TabletLayoutProps> = ({ isTabletLandscape })
 
           {/* Laws List Scroll Area with iOS 26 Inset Cards */}
           <div className="flex-1 overflow-y-auto p-2 sm:p-2.5 space-y-1.5 scrollbar-thin relative">
-            <AnimatePresence mode="popLayout" initial={false}>
-              {filteredLaws.length === 0 ? (
+            {filteredLaws.length === 0 ? (
                 <motion.div
                   key="tablet-empty"
                   initial={{ opacity: 0, scale: 0.96 }}
@@ -529,25 +552,16 @@ export const TabletLayout: React.FC<TabletLayoutProps> = ({ isTabletLandscape })
                   </button>
                 </motion.div>
               ) : (
-                filteredLaws.map(law => {
-                  const isSelected = activeLaw?.id === law.id;
-                  const bookmarked = isBookmarked(law.id);
+                <>
+                  {displayedFilteredLaws.map(law => {
+                    const isSelected = activeLaw?.id === law.id;
+                    const bookmarked = isBookmarked(law.id);
 
-                  return (
-                    <motion.div
-                      key={law.id}
-                      layout="position"
-                      initial={{ opacity: 0, y: 12, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -8, scale: 0.96, transition: { duration: 0.15 } }}
-                      transition={{
-                        layout: { type: 'spring', stiffness: 350, damping: 30 },
-                        opacity: { duration: 0.22 },
-                        y: { type: 'spring', stiffness: 380, damping: 28 }
-                      }}
-                      whileTap={{ scale: 0.985 }}
-                      onClick={() => setSelectedLaw(law)}
-                      className={`p-3 rounded-2xl cursor-pointer transition-all duration-200 relative border ${
+                    return (
+                      <div
+                        key={law.id}
+                        onClick={() => setSelectedLaw(law)}
+                        className={`p-3 rounded-2xl cursor-pointer relative border law-card-virtual ${
                       isSelected
                         ? 'bg-orange-500/10 dark:bg-[#7C5CFF]/15 border-orange-500/40 dark:border-[#7C5CFF]/50 shadow-[0_4px_16px_rgba(249,115,22,0.1)] dark:shadow-[0_4px_16px_rgba(124,92,255,0.15)] ring-1 ring-orange-500/20 dark:ring-[#7C5CFF]/20'
                         : 'bg-white dark:bg-[#141414] border-slate-200/80 dark:border-[#222222] hover:bg-slate-50/90 dark:hover:bg-[#181818]'
@@ -625,11 +639,22 @@ export const TabletLayout: React.FC<TabletLayoutProps> = ({ isTabletLandscape })
                       </span>
                     </div>
 
-                  </motion.div>
+                  </div>
                 );
-              })
-            )}
-            </AnimatePresence>
+              })}
+
+              {visibleTabletCount < filteredLaws.length && (
+                <div ref={tabletSentinelRef} className="py-2 text-center">
+                  <button
+                    onClick={() => setVisibleTabletCount(prev => prev + 24)}
+                    className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#181818] dark:hover:bg-[#202020] text-[11px] font-semibold text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                  >
+                    Load More ({filteredLaws.length - visibleTabletCount} remaining)
+                  </button>
+                </div>
+              )}
+            </>
+          )}
           </div>
 
         </section>

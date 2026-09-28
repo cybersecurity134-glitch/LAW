@@ -3,17 +3,17 @@ import React, { memo } from 'react';
 export const LawBackground: React.FC = memo(() => {
   return (
     <div 
-      className="fixed inset-0 pointer-events-none overflow-hidden z-0 select-none bg-white dark:bg-[#050505] transition-colors duration-300 transform-gpu [contain:strict]"
+      className="fixed inset-0 pointer-events-none overflow-hidden z-0 select-none bg-white dark:bg-[#050505] transform-gpu [contain:strict]"
       aria-hidden="true"
     >
-      {/* 1. Ambient Judicial Caustic Glows */}
-      <div className="absolute -top-32 -left-32 w-[38rem] h-[38rem] bg-gradient-to-br from-amber-400/12 via-orange-400/8 to-transparent dark:from-[#7C5CFF]/15 dark:via-[#7C5CFF]/5 dark:to-transparent rounded-full blur-3xl opacity-75 dark:opacity-40 liquid-orb-1" />
-      <div className="absolute top-1/4 -right-28 w-[42rem] h-[42rem] bg-gradient-to-tl from-indigo-400/12 via-blue-400/8 to-sky-300/8 dark:from-[#7C5CFF]/12 dark:via-[#3B82F6]/8 dark:to-transparent rounded-full blur-3xl opacity-70 dark:opacity-30 liquid-orb-2" />
-      <div className="absolute -bottom-36 left-1/4 w-[40rem] h-[40rem] bg-gradient-to-tr from-emerald-400/10 via-teal-400/8 to-amber-300/6 dark:from-[#7C5CFF]/10 dark:via-[#22C55E]/5 dark:to-transparent rounded-full blur-3xl opacity-65 dark:opacity-25 liquid-orb-3" />
-      <div className="absolute top-2/3 right-1/4 w-96 h-96 bg-gradient-to-r from-amber-400/10 via-rose-300/8 to-transparent dark:from-[#7C5CFF]/8 dark:to-transparent rounded-full blur-3xl opacity-50 dark:opacity-20 liquid-pulse" />
+      {/* 1. Ambient Judicial Caustic Glows (Static, 0 GPU composite overhead) */}
+      <div className="absolute -top-32 -left-32 w-[38rem] h-[38rem] bg-gradient-to-br from-amber-400/12 via-orange-400/8 to-transparent dark:from-[#7C5CFF]/15 dark:via-[#7C5CFF]/5 dark:to-transparent rounded-full blur-3xl opacity-75 dark:opacity-40" />
+      <div className="absolute top-1/4 -right-28 w-[42rem] h-[42rem] bg-gradient-to-tl from-indigo-400/12 via-blue-400/8 to-sky-300/8 dark:from-[#7C5CFF]/12 dark:via-[#3B82F6]/8 dark:to-transparent rounded-full blur-3xl opacity-70 dark:opacity-30" />
+      <div className="absolute -bottom-36 left-1/4 w-[40rem] h-[40rem] bg-gradient-to-tr from-emerald-400/10 via-teal-400/8 to-amber-300/6 dark:from-[#7C5CFF]/10 dark:via-[#22C55E]/5 dark:to-transparent rounded-full blur-3xl opacity-65 dark:opacity-25" />
+      <div className="absolute top-2/3 right-1/4 w-96 h-96 bg-gradient-to-r from-amber-400/10 via-rose-300/8 to-transparent dark:from-[#7C5CFF]/8 dark:to-transparent rounded-full blur-3xl opacity-50 dark:opacity-20" />
 
       {/* 2. Watermark: Grand Scales of Justice (Libra) in Top-Right Background */}
-      <div className="absolute top-12 right-0 lg:right-12 w-[340px] h-[340px] sm:w-[460px] sm:h-[460px] opacity-[0.06] dark:opacity-[0.035] text-amber-800 dark:text-white transition-opacity duration-500">
+      <div className="absolute top-12 right-0 lg:right-12 w-[340px] h-[340px] sm:w-[460px] sm:h-[460px] opacity-[0.06] dark:opacity-[0.035] text-amber-800 dark:text-white">
         <svg
           viewBox="0 0 500 500"
           fill="none"

@@ -380,3 +380,72 @@ export interface ExtractedActDocument {
     notes?: string;
   };
 }
+
+// ==========================================
+// STARTUP NEWS & NETWORKING APP TYPES
+// ==========================================
+
+export type StartupUserRole = 'admin' | 'contributor' | 'viewer';
+
+export type StartupNewsCategory = 
+  | 'new_startup' 
+  | 'govt_scheme' 
+  | 'funding_option' 
+  | 'investment' 
+  | 'event' 
+  | 'problem_fix';
+
+export type StartupNewsStatus = 'pending' | 'approved' | 'rejected' | 'unpublished';
+
+export interface StartupNewsItem {
+  id: string;
+  category: StartupNewsCategory;
+  title: string;
+  summary: string;
+  body: string;
+  imageUrls: string[];
+  authorId: string;
+  authorName: string;
+  sourceName: string;
+  sourceUrl: string;
+  status: StartupNewsStatus;
+  verifiedBy?: string | null;
+  verifiedAt?: string | null;
+  rejectionReason?: string | null;
+  createdAt: string;
+  updatedAt?: string;
+  publishedAt?: string;
+  // Category-specific fields
+  startDate?: string;
+  endDate?: string;
+  location?: string;
+  investorName?: string;
+  startupName?: string;
+  amount?: string;
+  round?: string;
+  issuingBody?: string;
+  eligibility?: string;
+  deadline?: string;
+  problem?: string;
+  solution?: string;
+}
+
+export interface NetworkingChat {
+  id: string;
+  participants: string[];
+  participantsKey: string;
+  lastMessage: string;
+  lastMessageAt: string;
+  lastSenderId?: string | null;
+  createdAt: string;
+  unreadCounts?: Record<string, number>;
+}
+
+export interface NetworkingMessage {
+  id: string;
+  senderId: string;
+  text: string;
+  createdAt: string;
+  readBy: string[];
+}
+

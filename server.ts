@@ -6,6 +6,7 @@ import { GoogleGenAI } from "@google/genai";
 import { LAWS_DATABASE, UPDATE_HISTORY } from "./src/data/laws";
 import { CATEGORIES } from "./src/data/categories";
 import { legalDataSyncService } from "./server/legalDataSyncService";
+import { aiRouter } from "./server/ai/routes";
 
 dotenv.config();
 
@@ -14,6 +15,9 @@ const PORT = 3000;
 
 app.use(express.json({ limit: "30mb" }));
 app.use(express.urlencoded({ extended: true, limit: "30mb" }));
+
+// Mount Unified Multi-Provider AI Engine (Gemini + OpenAI + Claude)
+app.use("/api/ai", aiRouter);
 
 // Initialize Gemini client lazily/safely
 let geminiClient: GoogleGenAI | null = null;
@@ -792,6 +796,7 @@ app.post("/api/ai/stream", async (req, res) => {
       const configObj: any = {
         systemInstruction,
         temperature: 0.2,
+        maxOutputTokens: 1200,
       };
 
       if (triggerWebSearch) {
@@ -942,6 +947,7 @@ app.post("/api/ai/ask", async (req, res) => {
         const configObj: any = {
           systemInstruction,
           temperature: 0.2,
+          maxOutputTokens: 1200,
         };
 
         if (triggerWebSearch) {

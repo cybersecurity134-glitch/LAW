@@ -4,7 +4,6 @@ import {
   Scale, 
   Sun, 
   Moon, 
-  Sparkles, 
   MapPin, 
   User as UserIcon, 
   Search,
@@ -14,11 +13,12 @@ import {
   Menu,
   X,
   Film,
-  Database
+  Database,
+  Sparkles
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { MOTION_EASINGS } from '../utils/motion';
-import { preloadAIAssistant, preloadOnboarding } from '../utils/preload';
+import { preloadOnboarding } from '../utils/preload';
 
 export const Navbar: React.FC = () => {
   const { 
@@ -30,7 +30,6 @@ export const Navbar: React.FC = () => {
     setActiveTab, 
     setShowAuthModal,
     setShowOnboardingModal,
-    setShowAIAssistant,
     setShowIngestionModal,
     isMobileSidebarOpen,
     toggleMobileSidebar,
@@ -180,6 +179,18 @@ export const Navbar: React.FC = () => {
             <span className="hidden lg:inline text-[11px]">Intro</span>
           </motion.button>
 
+          {/* Startup Pulse & Networking Feed Button */}
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setActiveTab('startup')}
+            className="hidden sm:flex items-center gap-1.5 min-h-[44px] px-3.5 py-2 rounded-full liquid-pill text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 border border-indigo-500/30 cursor-pointer liquid-select-item group transition-all bg-indigo-500/10"
+            title="Startup News, Funding & Networking"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-indigo-500 shrink-0 transition-transform duration-200 group-hover:scale-110" />
+            <span className="font-bold">Startup Pulse</span>
+          </motion.button>
+
           {/* Law Book Ingestion Engine Button */}
           <motion.button
             whileHover={{ scale: 1.03 }}
@@ -192,23 +203,6 @@ export const Navbar: React.FC = () => {
             <Database className="w-3.5 h-3.5 text-orange-500 dark:text-[#a78bfa] shrink-0 transition-transform duration-200 group-hover:scale-110" />
             <span className="hidden lg:inline">Ingest Law</span>
             <span className="lg:hidden">Ingest</span>
-          </motion.button>
-
-          {/* AI Legal Assistant Button with Subtle Premium Glow */}
-          <motion.button
-            whileHover={{ scale: 1.03, boxShadow: '0 0 22px rgba(249, 115, 22, 0.45)' }}
-            whileTap={{ scale: 0.95 }}
-            transition={{ type: 'spring', stiffness: 450, damping: 25 }}
-            onClick={() => setShowAIAssistant(true)}
-            onMouseEnter={preloadAIAssistant}
-            onTouchStart={preloadAIAssistant}
-            onFocus={preloadAIAssistant}
-            className="flex items-center gap-1.5 min-h-[44px] px-3 sm:px-4 py-2 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 dark:from-[#7C5CFF] dark:to-[#6340e6] text-white font-semibold text-xs sm:text-sm shadow-lg shadow-orange-500/25 dark:shadow-[#7C5CFF]/25 ring-1 ring-white/30 cursor-pointer liquid-select-item"
-            title="Ask AI about any Indian law or legal scenario"
-          >
-            <Sparkles className="w-4 h-4 text-white animate-pulse" />
-            <span className="hidden sm:inline">AI Assistant</span>
-            <span className="sm:hidden text-xs font-bold">AI</span>
           </motion.button>
 
           {/* Theme Switcher Dropdown */}

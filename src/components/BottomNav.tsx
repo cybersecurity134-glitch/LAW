@@ -1,11 +1,11 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Home, Search, Layers, Bookmark, Menu } from 'lucide-react';
+import { Home, Search, Layers, Bookmark, Menu, Sparkles } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { preloadTab } from '../utils/preload';
 
 interface NavItem {
-  id: 'home' | 'search' | 'categories' | 'saved' | 'profile';
+  id: 'home' | 'startup' | 'search' | 'categories' | 'saved' | 'profile';
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   badge?: number;
@@ -18,6 +18,13 @@ const MOBILE_THEMES: Record<string, { activeText: string; indicator: string; bad
     badge: 'bg-amber-500 text-white',
     ping: 'bg-amber-400',
     glow: 'drop-shadow-[0_0_8px_rgba(245,158,11,0.5)]'
+  },
+  startup: {
+    activeText: 'text-indigo-600 dark:text-indigo-400 font-bold',
+    indicator: 'bg-gradient-to-r from-indigo-400 to-purple-500 shadow-[0_0_8px_rgba(99,102,241,0.8)]',
+    badge: 'bg-indigo-500 text-white',
+    ping: 'bg-indigo-400',
+    glow: 'drop-shadow-[0_0_8px_rgba(99,102,241,0.5)]'
   },
   search: {
     activeText: 'text-cyan-600 dark:text-cyan-400 font-bold',
@@ -50,41 +57,75 @@ const MOBILE_THEMES: Record<string, { activeText: string; indicator: string; bad
 };
 
 const BottomNavComponent: React.FC = () => {
-  const { activeTab, setActiveTab, bookmarks } = useApp();
+  const { 
+    activeTab, 
+    setActiveTab, 
+    bookmarks,
+    setShowStartupSubmitModal,
+    setShowStartupChatModal,
+    setShowStartupAdminModal,
+    setShowAuthModal,
+    setSelectedLaw,
+    setShowAIAssistant
+  } = useApp();
 
   const navItems: NavItem[] = [
     { id: 'home', label: 'Home', icon: Home },
+    { id: 'startup', label: 'Startup', icon: Sparkles },
     { id: 'search', label: 'Search', icon: Search },
     { id: 'categories', label: 'Categories', icon: Layers },
     { id: 'saved', label: 'Saved', icon: Bookmark, badge: bookmarks.length },
     { id: 'profile', label: 'More', icon: Menu },
   ];
 
+  const handleTabClick = (tabId: NavItem['id']) => {
+    setActiveTab(tabId);
+    setShowStartupSubmitModal(false);
+    setShowStartupChatModal(false);
+    setShowStartupAdminModal(false);
+    setShowAuthModal(false);
+    setSelectedLaw(null);
+    setShowAIAssistant(false);
+  };
+
   return (
-    <nav className="min-[600px]:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/90 dark:bg-[#0B0B0B]/95 border-t border-slate-200/80 dark:border-[#292929] backdrop-blur-2xl transition-all shadow-[0_-8px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_-8px_30px_rgba(0,0,0,0.8)] pb-[env(safe-area-inset-bottom,4px)]">
-      <div className="grid grid-cols-5 h-16 max-w-lg mx-auto px-1">
+    <nav 
+      style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 60,
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        transform: 'translateZ(0)',
+        WebkitTransform: 'translateZ(0)',
+        contain: 'layout style',
+      }}
+      className="fixed bottom-0 left-0 right-0 z-[60] xl:hidden bg-white/90 dark:bg-[#0B0B0B]/95 border-t border-slate-200/80 dark:border-[#292929] backdrop-blur-2xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_-8px_30px_rgba(0,0,0,0.8)] pb-[env(safe-area-inset-bottom,0px)] select-none pointer-events-auto transition-none"
+      aria-label="Bottom navigation toolbar"
+    >
+      <div className="grid grid-cols-6 h-16 max-w-lg md:max-w-2xl mx-auto px-1 w-full items-center">
         {navItems.map(item => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
           const theme = MOBILE_THEMES[item.id] || MOBILE_THEMES.home;
 
           return (
-            <motion.button
+            <button
               key={item.id}
-              whileTap={{ scale: 0.90 }}
-              transition={{ type: 'spring', stiffness: 500, damping: 28 }}
-              onClick={() => setActiveTab(item.id)}
+              type="button"
+              onClick={() => handleTabClick(item.id)}
               onMouseEnter={() => preloadTab(item.id)}
               onTouchStart={() => preloadTab(item.id)}
               onFocus={() => preloadTab(item.id)}
-              className={`relative flex flex-col items-center justify-center min-h-[48px] py-1 gap-1 transition-colors duration-150 cursor-pointer select-none ${
+              className={`relative flex flex-col items-center justify-center min-h-[48px] py-1 gap-1 cursor-pointer select-none transition-none ${
                 isActive 
                   ? `${theme.activeText} dark:text-[#7C5CFF]` 
                   : 'text-slate-500 dark:text-[#777777] hover:text-slate-900 dark:hover:text-[#FFFFFF]'
               }`}
             >
               <div className="relative">
-                <Icon className={`w-5 h-5 transition-all duration-200 ${isActive ? `stroke-[2.5] ${theme.glow}` : 'stroke-2'}`} />
+                <Icon className={`w-5 h-5 transition-none ${isActive ? `stroke-[2.5] ${theme.glow}` : 'stroke-2'}`} />
                 {item.badge !== undefined && item.badge > 0 && (
                   <span className={`absolute -top-1.5 -right-2 px-1.5 py-0.2 text-[9px] font-bold ${theme.badge} rounded-full min-w-[15px] text-center shadow-xs font-mono`}>
                     {item.badge}
@@ -99,9 +140,9 @@ const BottomNavComponent: React.FC = () => {
               </div>
               <span className="text-[10px] tracking-tight whitespace-nowrap font-medium">{item.label}</span>
               {isActive && (
-                <div className={`absolute bottom-0.5 w-7 h-1 rounded-full ${theme.indicator} dark:bg-[#7C5CFF] dark:shadow-[0_0_8px_rgba(124,92,255,0.8)] animate-pulse`} />
+                <div className={`absolute bottom-0.5 w-7 h-1 rounded-full ${theme.indicator} dark:bg-[#7C5CFF] dark:shadow-[0_0_8px_rgba(124,92,255,0.8)]`} />
               )}
-            </motion.button>
+            </button>
           );
         })}
       </div>

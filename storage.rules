@@ -1,0 +1,61 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Deny all by default
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.role == 'admin' ||
+        (request.auth.token.email != null && request.auth.token.email == 'cybersecurity134@gmail.com')
+      );
+    }
+
+    function isContributor() {
+      return isSignedIn() && (
+        isAdmin() ||
+        request.auth.token.role == 'contributor'
+      );
+    }
+
+    function hasUploadPermission() {
+      return isAdmin() || (
+        isContributor() &&
+        request.auth.token.uploadPermissionUntil is number &&
+        request.auth.token.uploadPermissionUntil > request.time.toMillis()
+      );
+    }
+
+    function isValidImage() {
+      return request.resource.contentType.matches('image/(jpeg|png|webp|gif|svg\\+xml)') &&
+             request.resource.size <= 5 * 1024 * 1024; // 5 MB maximum
+    }
+
+    // News images: public read for approved articles, write restricted to author with upload permission
+    match /news/{userId}/{fileName} {
+      allow read: if true;
+      allow write: if isSignedIn() &&
+                      request.auth.uid == userId &&
+                      hasUploadPermission() &&
+                      isValidImage();
+      allow delete: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+    }
+
+    // User profile avatars
+    match /avatars/{userId}/{fileName} {
+      allow read: if true;
+      allow write: if isSignedIn() &&
+                      request.auth.uid == userId &&
+                      isValidImage();
+      allow delete: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+    }
+  }
+}

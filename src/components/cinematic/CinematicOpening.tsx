@@ -61,28 +61,10 @@ export const CinematicOpening: React.FC<CinematicOpeningProps> = ({
     return spokes;
   }, []);
 
-  // Sequence scheduling
+  // Zero animation: immediately complete opening
   useEffect(() => {
-    // 1. Text Typewriter Reveal: Starts at 800ms, 60ms per character
-    const typeStart = 800;
-    for (let i = 1; i <= titleText.length; i++) {
-      const t = window.setTimeout(() => {
-        setDisplayedTitleLength(i);
-      }, typeStart + (i * 65));
-      timerRefs.current.push(t);
-    }
-
-    // 2. Scheduled auto-exit at (duration - 280ms)
-    const exitTime = Math.max(1200, duration - 280);
-    const exitTimer = window.setTimeout(() => {
-      handleDismiss();
-    }, exitTime);
-    timerRefs.current.push(exitTimer);
-
-    return () => {
-      timerRefs.current.forEach(t => clearTimeout(t));
-    };
-  }, [duration, handleDismiss, titleText.length]);
+    onComplete();
+  }, [onComplete]);
 
   return (
     <motion.div

@@ -30,38 +30,7 @@ function getDevice(w: number): BreakpointDevice {
   return 'desktop';
 }
 
-export function useBreakpoint(): BreakpointState {
-  const [width, setWidth] = useState<number>(() => {
-    if (typeof window !== 'undefined') {
-      return window.innerWidth;
-    }
-    return 1200;
-  });
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    const handleResize = () => {
-      // Debounce slightly for smooth performance
-      if (timeoutId) clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        setWidth(window.innerWidth);
-      }, 50);
-    };
-
-    window.addEventListener('resize', handleResize, { passive: true });
-    window.addEventListener('orientationchange', handleResize, { passive: true });
-    // Initial sync
-    setWidth(window.innerWidth);
-
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('orientationchange', handleResize);
-    };
-  }, []);
-
+function computeBreakpointState(width: number): BreakpointState {
   const device = getDevice(width);
   const isSmallPhone = width < 375;
   const isPhoneOnly = width >= 375 && width < 481;
@@ -84,4 +53,50 @@ export function useBreakpoint(): BreakpointState {
     isTablet,
     isDesktop,
   };
+}
+
+export function useBreakpoint(): BreakpointState {
+  const [state, setState] = useState<BreakpointState>(() => {
+    const w = typeof window !== 'undefined' ? window.innerWidth : 1200;
+    return computeBreakpointState(w);
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    let rafId: number | null = null;
+    let lastWidth = window.innerWidth;
+
+    const handleResize = () => {
+      if (rafId !== null) return;
+
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        const currentWidth = window.innerWidth;
+        // Avoid re-renders if width has not materially changed
+        if (currentWidth === lastWidth) return;
+        lastWidth = currentWidth;
+
+        setState(prev => {
+          const nextDevice = getDevice(currentWidth);
+          // If the device bracket is the same and width delta is small, avoid unnecessary re-render churn
+          if (prev.device === nextDevice && Math.abs(prev.width - currentWidth) < 20) {
+            return prev;
+          }
+          return computeBreakpointState(currentWidth);
+        });
+      });
+    };
+
+    window.addEventListener('resize', handleResize, { passive: true });
+    window.addEventListener('orientationchange', handleResize, { passive: true });
+
+    return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
+  }, []);
+
+  return state;
 }

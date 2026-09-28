@@ -33,6 +33,15 @@ import { MOTION_EASINGS } from '../../utils/motion';
 import { preloadSearchView } from '../../utils/preload';
 import { getEffectiveVoiceLanguage } from '../../data/languages';
 
+const QUICK_SUGGESTIONS = [
+  'Online UPI Fraud',
+  'Drunk Driving Penalty',
+  'Section 66 IT Act',
+  'Section 103 BNS',
+  'Cheque Bounce',
+  'RTI Application'
+];
+
 export const HomeView: React.FC = () => {
   const { 
     user, 
@@ -147,18 +156,25 @@ export const HomeView: React.FC = () => {
   const userState = user?.preferences?.state || 'Telangana';
   const userInterests = user?.preferences?.interests || [];
 
+  const categoryNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    CATEGORIES.forEach(c => map.set(c.id, c.name.toLowerCase()));
+    return map;
+  }, []);
+
   const recommendedLaws = useMemo(() => {
     return laws.filter(l => {
       const matchesState = l.state_applicability === 'All India' || l.state_applicability.includes(userState);
-      const catName = CATEGORIES.find(c => c.id === l.category_id)?.name || '';
-      const matchesCategory = userInterests.length === 0 || userInterests.some(interest => 
-        catName.toLowerCase().includes(interest.toLowerCase().slice(0, 5)) ||
-        l.keywords.some(k => interest.toLowerCase().includes(k.toLowerCase())) ||
-        l.category_id.toLowerCase().includes(interest.toLowerCase().slice(0, 5))
-      );
+      const catName = categoryNameMap.get(l.category_id) || '';
+      const matchesCategory = userInterests.length === 0 || userInterests.some(interest => {
+        const lowerInterest = interest.toLowerCase().slice(0, 5);
+        return catName.includes(lowerInterest) ||
+          l.keywords.some(k => k.toLowerCase().includes(lowerInterest)) ||
+          l.category_id.toLowerCase().includes(lowerInterest);
+      });
       return matchesState && (matchesCategory || l.featured);
     }).slice(0, 4);
-  }, [laws, userState, userInterests]);
+  }, [laws, userState, userInterests, categoryNameMap]);
 
   // Recently updated/amended laws
   const recentlyUpdatedLaws = useMemo(() => {
@@ -170,57 +186,32 @@ export const HomeView: React.FC = () => {
     return laws.filter(l => l.featured || (l.view_count && l.view_count > 10000)).slice(0, 4);
   }, [laws]);
 
-  // Bookmarked laws
+  // Bookmarked laws with O(1) set lookup
   const bookmarkedLaws = useMemo(() => {
-    return laws.filter(l => bookmarks.includes(l.id));
-  }, [laws, bookmarks]);
+    return laws.filter(l => bookmarkSet.has(l.id));
+  }, [laws, bookmarkSet]);
 
-  // Quick suggestions
-  const suggestions = [
-    'Online UPI Fraud',
-    'Drunk Driving Penalty',
-    'Section 66 IT Act',
-    'Section 103 BNS',
-    'Cheque Bounce',
-    'RTI Application'
-  ];
+  // Quick suggestions reference
+  const suggestions = QUICK_SUGGESTIONS;
 
   return (
     <div className="space-y-8 pb-12 view-blur-open">
       
-      {/* Hero Welcome & Greeting with Liquid Glass Morrison Depth & Staggered Motion */}
-      <motion.div
-        initial="hidden"
-        animate="visible"
-        variants={{
-          hidden: { opacity: 0 },
-          visible: {
-            opacity: 1,
-            transition: {
-              staggerChildren: 0.07,
-              delayChildren: 0.05
-            }
-          }
-        }}
+      {/* Hero Welcome & Greeting with Liquid Glass Morrison Depth */}
+      <div
         className="relative overflow-hidden rounded-3xl morrison-panel p-6 sm:p-8"
       >
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
             
             {/* 1. Greeting pill / status badge */}
-            <motion.div
-              variants={{
-                hidden: { opacity: 0, y: 12 },
-                visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: MOTION_EASINGS.appleDecel } }
-              }}
+            <div
               className="flex flex-wrap items-center gap-2"
             >
               <span className="text-xs font-bold px-3 py-1 rounded-full bg-orange-500/15 dark:bg-[#7C5CFF]/15 text-orange-600 dark:text-[#a78bfa] border border-orange-500/25 dark:border-[#7C5CFF]/30 shadow-xs">
                 {getGreeting()}, {user?.name || 'Citizen'}
               </span>
-              <motion.button
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.96 }}
+              <button
                 onClick={() => setShowOnboardingModal(true)}
                 className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full liquid-pill text-slate-700 dark:text-[#B3B3B3] transition-colors cursor-pointer"
                 title="Change preferences"
@@ -228,41 +219,26 @@ export const HomeView: React.FC = () => {
                 <MapPin className="w-3 h-3 text-rose-500 dark:text-[#EF4444]" />
                 <span>{userState}</span>
                 <span className="text-slate-400 dark:text-[#777777]">• {user?.preferences?.occupation || 'Citizen'}</span>
-              </motion.button>
-            </motion.div>
+              </button>
+            </div>
 
             {/* 2. Main Heading */}
-            <motion.h1
-              variants={{
-                hidden: { opacity: 0, y: 14 },
-                visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: MOTION_EASINGS.appleDecel } }
-              }}
+            <h1
               className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-[#FFFFFF] tracking-tight font-display"
             >
               Know Your Laws, <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 dark:from-[#7C5CFF] dark:via-[#9B82FF] dark:to-[#7C5CFF]">Sections & Rights</span>
-            </motion.h1>
+            </h1>
 
             {/* 3. Subtitle Description */}
-            <motion.p
-              variants={{
-                hidden: { opacity: 0, y: 12 },
-                visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: MOTION_EASINGS.appleDecel } }
-              }}
+            <p
               className="text-xs sm:text-sm text-slate-600 dark:text-[#B3B3B3] max-w-2xl leading-relaxed"
             >
               Explore verified Indian statutes, acts, penalties, and bailable provisions from official gazettes in simplified language.
-            </motion.p>
+            </p>
           </div>
 
           {/* 4. Quick AI Trigger Card */}
-          <motion.div 
-            variants={{
-              hidden: { opacity: 0, y: 14, scale: 0.97 },
-              visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.45, ease: MOTION_EASINGS.appleDecel } }
-            }}
-            whileHover={{ scale: 1.02, y: -2 }}
-            whileTap={{ scale: 0.985 }}
-            transition={{ type: 'spring', stiffness: 420, damping: 25 }}
+          <div 
             onClick={() => setShowAIAssistant(true)}
             className="shrink-0 p-4 rounded-2xl liquid-glass-card cursor-pointer group max-w-sm hover:shadow-xl hover:border-orange-500/30 dark:hover:border-[#7C5CFF]/40 transition-colors"
           >
@@ -272,7 +248,7 @@ export const HomeView: React.FC = () => {
               </div>
               <div>
                 <div className="text-xs font-bold text-slate-900 dark:text-[#FFFFFF] group-hover:text-orange-500 dark:group-hover:text-[#7C5CFF] flex items-center gap-1.5 transition-colors">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                   <span>Nyaya AI Legal Guide</span>
                   <ChevronRight className="w-3.5 h-3.5 text-orange-500 dark:text-[#7C5CFF] group-hover:translate-x-0.5 transition-transform" />
                 </div>
@@ -281,16 +257,12 @@ export const HomeView: React.FC = () => {
                 </p>
               </div>
             </div>
-          </motion.div>
+          </div>
         </div>
 
         {/* 5. Search Bar Container */}
-        <motion.div
+        <div
           ref={searchBarContainerRef}
-          variants={{
-            hidden: { opacity: 0, y: 14 },
-            visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: MOTION_EASINGS.appleDecel } }
-          }}
           className="mt-6 pt-6 border-t border-black/5 dark:border-[#222222] relative"
         >
           <form onSubmit={handleSearchSubmit} className="relative">
@@ -351,30 +323,23 @@ export const HomeView: React.FC = () => {
           />
 
           {/* 6. Quick Suggestions Chips */}
-          <motion.div
-            variants={{
-              hidden: { opacity: 0, y: 10 },
-              visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: MOTION_EASINGS.appleDecel } }
-            }}
+          <div
             className="flex items-center gap-2 mt-3 overflow-x-auto pb-1 scrollbar-none text-xs"
           >
             <span className="text-slate-500 dark:text-[#777777] text-[11px] font-bold shrink-0">Popular:</span>
             {suggestions.map((item, i) => (
-              <motion.button
+              <button
                 key={i}
-                whileHover={{ scale: 1.04, y: -1 }}
-                whileTap={{ scale: 0.96 }}
-                transition={{ type: 'spring', stiffness: 450, damping: 24 }}
                 onClick={() => handleSuggestionClick(item)}
                 className="whitespace-nowrap px-3 py-1 rounded-full liquid-pill text-slate-700 dark:text-[#B3B3B3] hover:text-orange-600 dark:hover:text-[#FFFFFF] font-semibold transition-colors cursor-pointer dark:hover:border-[#7C5CFF]/40"
               >
                 {item}
-              </motion.button>
+              </button>
             ))}
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
 
-      </motion.div>
+      </div>
 
       {/* 4 Feature Statutory Cards (Criminal, Cyber, Rights, Traffic) */}
       <section className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
@@ -555,7 +520,9 @@ export const HomeView: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {recommendedLaws.map(law => (
-            <LawCard key={law.id} law={law} isSaved={bookmarkSet.has(law.id)} />
+            <div key={law.id} className="law-card-virtual">
+              <LawCard law={law} isSaved={bookmarkSet.has(law.id)} />
+            </div>
           ))}
         </div>
       </div>
@@ -631,7 +598,9 @@ export const HomeView: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {recentlyUpdatedLaws.map(law => (
-            <LawCard key={law.id} law={law} isSaved={bookmarkSet.has(law.id)} />
+            <div key={law.id} className="law-card-virtual">
+              <LawCard law={law} isSaved={bookmarkSet.has(law.id)} />
+            </div>
           ))}
         </div>
       </div>
@@ -722,7 +691,9 @@ export const HomeView: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {popularLaws.map(law => (
-            <LawCard key={law.id} law={law} isSaved={bookmarkSet.has(law.id)} />
+            <div key={law.id} className="law-card-virtual">
+              <LawCard law={law} isSaved={bookmarkSet.has(law.id)} />
+            </div>
           ))}
         </div>
       </div>
@@ -746,7 +717,9 @@ export const HomeView: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {bookmarkedLaws.slice(0, 2).map(law => (
-              <LawCard key={law.id} law={law} isSaved={bookmarkSet.has(law.id)} />
+              <div key={law.id} className="law-card-virtual">
+                <LawCard law={law} isSaved={bookmarkSet.has(law.id)} />
+              </div>
             ))}
           </div>
         </div>

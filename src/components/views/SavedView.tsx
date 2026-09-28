@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { 
   Bookmark, 
@@ -31,9 +31,11 @@ export const SavedView: React.FC = () => {
   const [savedSearch, setSavedSearch] = useState('');
   const [copiedAll, setCopiedAll] = useState(false);
 
+  const bookmarkSet = useMemo(() => new Set(bookmarks), [bookmarks]);
+
   const bookmarkedLaws = useMemo(() => {
-    return laws.filter(l => bookmarks.includes(l.id));
-  }, [laws, bookmarks]);
+    return laws.filter(l => bookmarkSet.has(l.id));
+  }, [laws, bookmarkSet]);
 
   const filteredBookmarks = useMemo(() => {
     const q = savedSearch.trim().toLowerCase();
@@ -48,7 +50,7 @@ export const SavedView: React.FC = () => {
     });
   }, [bookmarkedLaws, savedSearch]);
 
-  const handleCopyAll = async () => {
+  const handleCopyAll = useCallback(async () => {
     if (bookmarkedLaws.length === 0) return;
     const text = bookmarkedLaws.map(l => (
       `• ${l.act_name} - ${l.section_number}: ${l.section_title}\nPunishment: ${l.punishment} | Fine: ${l.fine}\nSource: ${l.source} (${l.source_url})`
@@ -59,7 +61,7 @@ export const SavedView: React.FC = () => {
       setCopiedAll(true);
       setTimeout(() => setCopiedAll(false), 2000);
     }
-  };
+  }, [bookmarkedLaws]);
 
   return (
     <div className="space-y-6 pb-12 view-blur-open">
@@ -109,7 +111,9 @@ export const SavedView: React.FC = () => {
           {/* Grid of Saved Laws */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filteredBookmarks.map(law => (
-              <LawCard key={law.id} law={law} isSaved={true} />
+              <div key={law.id} className="law-card-virtual">
+                <LawCard law={law} isSaved={true} />
+              </div>
             ))}
           </div>
 

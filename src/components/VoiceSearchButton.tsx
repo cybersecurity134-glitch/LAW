@@ -106,22 +106,22 @@ export const VoiceSearchButton: React.FC<VoiceSearchButtonProps> = memo(({
         }`}
       >
         {isListening ? (
-          <div className="flex items-center gap-0.5 justify-center">
-            {/* Animated Audio Wave Bars */}
+          <div className="flex items-center gap-0.5 justify-center h-4">
+            {/* Animated Audio Wave Bars (GPU accelerated scaleY) */}
             <motion.span
-              animate={{ height: ['4px', '12px', '4px'] }}
+              animate={{ scaleY: [0.25, 0.8, 0.25] }}
               transition={{ duration: 0.5, repeat: Infinity, repeatType: 'reverse' }}
-              className="w-0.5 bg-white rounded-full"
+              className="w-0.5 h-4 bg-white rounded-full origin-center gpu-accelerated"
             />
             <motion.span
-              animate={{ height: ['8px', '16px', '8px'] }}
+              animate={{ scaleY: [0.5, 1, 0.5] }}
               transition={{ duration: 0.4, repeat: Infinity, repeatType: 'reverse', delay: 0.1 }}
-              className="w-0.5 bg-white rounded-full"
+              className="w-0.5 h-4 bg-white rounded-full origin-center gpu-accelerated"
             />
             <motion.span
-              animate={{ height: ['5px', '13px', '5px'] }}
+              animate={{ scaleY: [0.3, 0.85, 0.3] }}
               transition={{ duration: 0.45, repeat: Infinity, repeatType: 'reverse', delay: 0.2 }}
-              className="w-0.5 bg-white rounded-full"
+              className="w-0.5 h-4 bg-white rounded-full origin-center gpu-accelerated"
             />
           </div>
         ) : (

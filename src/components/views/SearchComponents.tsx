@@ -1,4 +1,4 @@
-import React, { memo, useState } from 'react';
+import React, { memo, useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Filter, 
@@ -275,10 +275,11 @@ export const SearchFiltersPanel = memo<SearchFiltersPanelProps>(({
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          exit={{ opacity: 0, height: 0 }}
-          transition={{ duration: 0.2 }}
+          initial={{ opacity: 0, scaleY: 0.96, y: -6 }}
+          animate={{ opacity: 1, scaleY: 1, y: 0 }}
+          exit={{ opacity: 0, scaleY: 0.96, y: -6 }}
+          transition={{ duration: 0.18, ease: MOTION_EASINGS.appleDecel }}
+          style={{ transformOrigin: 'top center', willChange: 'transform, opacity' }}
           className="overflow-hidden p-4 sm:p-5 rounded-3xl liquid-glass-card space-y-4 dark:border-[#292929]"
         >
           <div className="flex items-center justify-between pb-3 border-b border-black/5 dark:border-[#222222]">
@@ -449,18 +450,37 @@ export const SearchResultsGrid = memo<SearchResultsGridProps>(({
   bookmarkSet,
   onLoadMore
 }) => {
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // Auto load next slice smoothly when scrolling near bottom of results
+  useEffect(() => {
+    if (!sentinelRef.current || visibleCount >= totalCount) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          onLoadMore();
+        }
+      },
+      { rootMargin: '300px' }
+    );
+
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [visibleCount, totalCount, onLoadMore]);
+
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative">
         {displayedResults.map((law) => (
-          <div key={law.id} className="h-full flex flex-col">
+          <div key={law.id} className="h-full flex flex-col law-card-virtual">
             <LawCard law={law} isSaved={bookmarkSet.has(law.id)} className="h-full" />
           </div>
         ))}
       </div>
 
       {totalCount > visibleCount && (
-        <div className="flex justify-center pt-2">
+        <div ref={sentinelRef} className="flex justify-center pt-2">
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}

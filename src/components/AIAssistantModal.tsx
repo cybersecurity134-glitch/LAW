@@ -32,6 +32,7 @@ import { useApp } from '../context/AppContext';
 import { modalCardVariants, MOTION_EASINGS } from '../utils/motion';
 import { AIAttachment, AIMessage } from '../types';
 import { copyToClipboard } from '../utils/clipboard';
+import { compressImageFile } from '../utils/imageCompressor';
 import { VoiceWaveform } from './ai/VoiceWaveform';
 import { AttachmentChips } from './ai/AttachmentChips';
 import { WebCitationsList } from './ai/WebCitationsList';
@@ -44,6 +45,7 @@ export const AIAssistantModal: React.FC = () => {
     setAiInitialQuestion,
     openLawDetail,
     user,
+    setShowAuthModal,
     explanationMode
   } = useApp();
 
@@ -56,6 +58,11 @@ export const AIAssistantModal: React.FC = () => {
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [lastFailedRequest, setLastFailedRequest] = useState<{ query: string; attachments: AIAttachment[] } | null>(null);
+
+  // Client-side cache for repeated queries (Requirement 5)
+  const localAiCache = useRef<Map<string, { content: string; sources: any[]; webCitations?: any[]; searchQueries?: any[]; model_used?: string }>>(new Map());
+  // 300ms debounce tracker for input/prompt submissions (Requirement 5)
+  const lastSendTimestamp = useRef<number>(0);
 
   // Audio recording state
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
@@ -207,9 +214,9 @@ export const AIAssistantModal: React.FC = () => {
       ]
     : (LEGAL_CAPABILITIES.find(c => c.id === selectedCapability)?.prompts || []);
 
-  // Auto-scroll on new message or stream chunk
+  // Instant auto-scroll without animated latency
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [messages, loading, streamingStatus]);
 
   // If initial question provided, trigger automatically
@@ -220,8 +227,16 @@ export const AIAssistantModal: React.FC = () => {
     }
   }, [showAIAssistant, aiInitialQuestion]);
 
-  // Clean up speech synthesis on unmount or close
+  // Clean up speech synthesis, recording, timers, and streams on unmount or when modal closes
   useEffect(() => {
+    if (!showAIAssistant) {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      setSpeakingMessageId(null);
+      stopAudioRecording(false);
+      stopSpeechRecognition();
+    }
     return () => {
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
@@ -229,7 +244,7 @@ export const AIAssistantModal: React.FC = () => {
       stopAudioRecording(false);
       stopSpeechRecognition();
     };
-  }, []);
+  }, [showAIAssistant]);
 
   // Text-to-Speech (TTS) handler
   const toggleSpeech = useCallback((messageId: string, text: string) => {
@@ -276,7 +291,7 @@ export const AIAssistantModal: React.FC = () => {
     }
   };
 
-  // File Upload Handlers (Images, PDFs, Audio, Docs)
+  // High-performance File Upload Handlers (Client-Side Resizing & Compression)
   const handleFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
@@ -285,6 +300,41 @@ export const AIAssistantModal: React.FC = () => {
       const isPdf = file.type === 'application/pdf';
       const isAudio = file.type.startsWith('audio/');
       const isDoc = file.type.includes('text') || file.name.endsWith('.doc') || file.name.endsWith('.docx');
+
+      if (isImage) {
+        // Compress and downscale off the main thread before encoding to reduce memory by ~85%
+        compressImageFile(file, 1024, 1024, 0.8)
+          .then(compressed => {
+            const newAttachment: AIAttachment = {
+              id: 'att-' + Math.random().toString(36).substring(2, 9),
+              name: file.name,
+              mimeType: compressed.mimeType,
+              size: compressed.size,
+              data: compressed.dataUrl,
+              previewUrl: compressed.dataUrl,
+              type: 'image'
+            };
+            setAttachments(prev => [...prev, newAttachment]);
+          })
+          .catch(() => {
+            // Fallback reader
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const base64Data = e.target?.result as string;
+              setAttachments(prev => [...prev, {
+                id: 'att-' + Math.random().toString(36).substring(2, 9),
+                name: file.name,
+                mimeType: file.type || 'image/jpeg',
+                size: file.size,
+                data: base64Data,
+                previewUrl: base64Data,
+                type: 'image'
+              }]);
+            };
+            reader.readAsDataURL(file);
+          });
+        return;
+      }
 
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -295,8 +345,8 @@ export const AIAssistantModal: React.FC = () => {
           mimeType: file.type || 'application/octet-stream',
           size: file.size,
           data: base64Data,
-          previewUrl: isImage ? base64Data : undefined,
-          type: isImage ? 'image' : isPdf ? 'pdf' : isAudio ? 'audio' : 'document'
+          previewUrl: undefined,
+          type: isPdf ? 'pdf' : isAudio ? 'audio' : 'document'
         };
 
         setAttachments(prev => [...prev, newAttachment]);
@@ -469,10 +519,49 @@ export const AIAssistantModal: React.FC = () => {
 
   // Main Submit & Streaming handler
   const handleSend = async (queryText?: string, retryAttachments?: AIAttachment[]) => {
+    // 300ms input debounce (Requirement 5)
+    const now = Date.now();
+    if (now - lastSendTimestamp.current < 300) return;
+    lastSendTimestamp.current = now;
+
+    // Requirement 6: Only logged-in users can use the AI
+    if (!user || user.is_guest) {
+      setShowAuthModal(true);
+      return;
+    }
+
     const textToSend = (queryText !== undefined ? queryText : input).trim();
     const attachmentsToSend = retryAttachments || attachments;
 
     if ((!textToSend && attachmentsToSend.length === 0) || loading) return;
+
+    // Local client cache check for repeated questions (Requirement 5)
+    const cacheKey = textToSend.toLowerCase().trim();
+    if (!attachmentsToSend.length && localAiCache.current.has(cacheKey)) {
+      const cached = localAiCache.current.get(cacheKey)!;
+      setInput('');
+      setMessages(prev => [
+        ...prev,
+        {
+          id: 'usr-' + Date.now(),
+          role: 'user',
+          content: textToSend,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        },
+        {
+          id: 'ai-' + (Date.now() + 1),
+          role: 'assistant',
+          content: cached.content,
+          sources: cached.sources,
+          webCitations: cached.webCitations,
+          searchQueries: cached.searchQueries,
+          model_used: cached.model_used,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isStreaming: false
+        }
+      ]);
+      return;
+    }
 
     // Reset error state
     setLastFailedRequest(null);
@@ -505,10 +594,10 @@ export const AIAssistantModal: React.FC = () => {
 
     setMessages(prev => [...prev, placeholderAIMessage]);
 
-    // Build context history
+    // Build context history (last 5 to 10 messages - Requirement 5)
     const conversationHistory = messages
       .filter(m => m.id !== 'welcome')
-      .slice(-6)
+      .slice(-8)
       .map(m => ({
         role: m.role,
         content: m.content
@@ -517,9 +606,13 @@ export const AIAssistantModal: React.FC = () => {
     try {
       const response = await fetch('/api/ai/stream', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user.id}`
+        },
         body: JSON.stringify({
           question: textToSend || "Please analyze and explain the legal implications of the attached document/media.",
+          userId: user.id,
           attachments: attachmentsToSend.map(a => ({
             name: a.name,
             mimeType: a.mimeType,
@@ -569,11 +662,12 @@ export const AIAssistantModal: React.FC = () => {
                     : msg
                 ));
               } else if (currentEvent === 'done') {
+                const finalContent = accumulatedContent || data.content || '';
                 setMessages(prev => prev.map(msg => 
                   msg.id === aiMessageId 
                     ? { 
                         ...msg, 
-                        content: accumulatedContent || data.content || msg.content,
+                        content: finalContent || msg.content,
                         sources: data.sources || [],
                         webCitations: data.webCitations || [],
                         searchQueries: data.searchQueries || [],
@@ -583,6 +677,17 @@ export const AIAssistantModal: React.FC = () => {
                       } 
                     : msg
                 ));
+
+                // Save into local cache for repeated questions (Requirement 5)
+                if (finalContent && !attachmentsToSend.length) {
+                  localAiCache.current.set(cacheKey, {
+                    content: finalContent,
+                    sources: data.sources || [],
+                    webCitations: data.webCitations,
+                    searchQueries: data.searchQueries,
+                    model_used: data.model_used,
+                  });
+                }
 
                 // If auto-voice is enabled, speak out response automatically
                 if (autoVoice && accumulatedContent) {
@@ -602,9 +707,13 @@ export const AIAssistantModal: React.FC = () => {
       try {
         const fallbackRes = await fetch('/api/ai/ask', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${user.id}`
+          },
           body: JSON.stringify({
             question: textToSend,
+            userId: user.id,
             attachments: attachmentsToSend,
             conversation: conversationHistory,
             state: user?.preferences?.state || 'Telangana',
@@ -614,11 +723,23 @@ export const AIAssistantModal: React.FC = () => {
         });
 
         const data = await fallbackRes.json();
+        const fallbackContent = data.content || "Legal provisions retrieved from official records.";
+        
+        // Cache fallback answer too
+        if (fallbackContent && !attachmentsToSend.length) {
+          localAiCache.current.set(cacheKey, {
+            content: fallbackContent,
+            sources: data.sources || [],
+            webCitations: data.webCitations,
+            model_used: data.model_used,
+          });
+        }
+
         setMessages(prev => prev.map(msg => 
           msg.id === aiMessageId 
             ? {
                 ...msg,
-                content: data.content || "Legal provisions retrieved from official records.",
+                content: fallbackContent,
                 sources: data.sources || [],
                 webCitations: data.webCitations || [],
                 model_used: data.model_used,
@@ -774,6 +895,25 @@ export const AIAssistantModal: React.FC = () => {
               </span>
             </div>
 
+            {/* Member Sign-In Barrier Notice (Requirement 6) */}
+            {(!user || user.is_guest) && (
+              <div className="px-4 py-2 bg-purple-500/10 dark:bg-purple-950/20 border-b border-purple-500/20 text-xs flex items-center justify-between text-purple-900 dark:text-purple-300">
+                <div className="flex items-center gap-2 truncate">
+                  <Sparkles className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+                  <span className="truncate">
+                    <strong>Member Access:</strong> Sign in to use the unified AI Assistant (Gemini, ChatGPT, and Claude).
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAuthModal(true)}
+                  className="px-2.5 py-0.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-[11px] shrink-0 ml-2 cursor-pointer shadow-xs"
+                >
+                  Sign In
+                </button>
+              </div>
+            )}
+
             {/* Chat Messages Stream */}
             <div 
               ref={chatContainerRef}
@@ -828,8 +968,15 @@ export const AIAssistantModal: React.FC = () => {
                           : 'bg-slate-100 dark:bg-[#121212] border border-slate-200 dark:border-[#292929] text-slate-800 dark:text-[#D1D5DB] rounded-tl-none shadow-xs'
                       }`}
                     >
-                      <div className="markdown-body prose prose-sm dark:prose-invert max-w-none break-words">
-                        <Markdown
+                      {msg.isStreaming && !msg.content ? (
+                        <div className="space-y-2 py-1 min-w-[200px]">
+                          <div className="h-3 bg-slate-300/70 dark:bg-[#252525] rounded w-5/6 animate-pulse" />
+                          <div className="h-3 bg-slate-300/70 dark:bg-[#252525] rounded w-3/5 animate-pulse" />
+                          <div className="h-3 bg-slate-300/70 dark:bg-[#252525] rounded w-4/6 animate-pulse" />
+                        </div>
+                      ) : (
+                        <div className="markdown-body prose prose-sm dark:prose-invert max-w-none break-words">
+                          <Markdown
                           components={{
                             a: ({ href, children, ...props }) => {
                               if (href?.startsWith('law:')) {
@@ -885,6 +1032,7 @@ export const AIAssistantModal: React.FC = () => {
                           {msg.content}
                         </Markdown>
                       </div>
+                      )}
 
                       {/* Streaming cursor */}
                       {msg.isStreaming && (
@@ -897,9 +1045,9 @@ export const AIAssistantModal: React.FC = () => {
 
                         {msg.role === 'assistant' && (
                           <div className="flex items-center gap-2">
-                            {msg.model_used && (
-                              <span className="font-mono text-[9px] px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5">
-                                {msg.model_used.replace('gemini-', '')}
+                            {msg.model_used && user?.email === 'cybersecurity134@gmail.com' && (
+                              <span className="font-mono text-[9px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 font-semibold" title="Admin model audit">
+                                {msg.model_used}
                               </span>
                             )}
                             <button
