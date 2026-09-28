@@ -199,7 +199,7 @@ export const HomeView: React.FC = () => {
       
       {/* Hero Welcome & Greeting with Liquid Glass Morrison Depth */}
       <div
-        className="relative overflow-hidden rounded-3xl morrison-panel p-6 sm:p-8"
+        className="relative overflow-hidden rounded-3xl morrison-panel p-6 sm:p-8 !bg-white/98 dark:!bg-[#28282d]/92 !border-slate-200/80 dark:!border-white/20"
       >
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
@@ -224,9 +224,10 @@ export const HomeView: React.FC = () => {
 
             {/* 2. Main Heading */}
             <h1
-              className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-[#FFFFFF] tracking-tight font-display"
+              className="text-2xl sm:text-3xl md:text-4xl font-extrabold !text-white tracking-tight font-display"
+              style={{ color: '#ffffff' }}
             >
-              Know Your Laws, <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 dark:from-[#7C5CFF] dark:via-[#9B82FF] dark:to-[#7C5CFF]">Sections & Rights</span>
+              Know Your Laws, <span className="!text-white" style={{ color: '#ffffff' }}>Sections & Rights</span>
             </h1>
 
             {/* 3. Subtitle Description */}
